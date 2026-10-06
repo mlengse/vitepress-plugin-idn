@@ -1,0 +1,16 @@
+node_modules/
+dist/
+playground/.vitepress/cache/
+playground/.vitepress/dist/
+coverage/
+*.log
+.env*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.tsbuildinfo
+
+.codegraph/
+.opencode/
+.smoke.mts

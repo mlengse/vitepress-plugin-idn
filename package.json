@@ -1,0 +1,64 @@
+{
+  "name": "vitepress-plugin-idn",
+  "version": "0.1.0",
+  "description": "Indonesian language capabilities for VitePress: morphology-aware search, stemming, syllabification and hyphenation",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./vue": {
+      "types": "./dist/vue.d.ts",
+      "default": "./dist/vue.js"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.ts",
+      "default": "./dist/node/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsup && node scripts/copy-assets.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "playground:dev": "vitepress dev playground",
+    "playground:build": "vitepress build playground",
+    "playground:preview": "vitepress preview playground",
+    "bench": "node scripts/bench-build.mjs"
+  },
+  "peerDependencies": {
+    "vitepress": "^1.5.0 || ^1.6.0",
+    "vue": "^3.3.0"
+  },
+  "dependencies": {
+    "hyphen": "^1.14.1",
+    "minisearch": "^7.2.0",
+    "sastrawijs": "^1.1.0",
+    "stemmer": "^2.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/hyphen": "^1.14.0",
+    "@types/node": "^20.19.43",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "stopwords-iso": "^1.1.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "vitepress": "^1.6.4",
+    "vitest": "^2.1.9",
+    "vue": "^3.5.43",
+    "vue-eslint-parser": "^10.4.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
