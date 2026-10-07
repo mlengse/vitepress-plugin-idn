@@ -7,36 +7,44 @@ own licenses. Attribution and notices follow.
 
 --------------------------------------------------------------------------
 
-1. sastrawijs
+1. sastrawijs-ts
    License: MIT
-   Homepage: https://github.com/damzaky/sastrawijs
+   Homepage: https://github.com/mlengse/sastrawijs-ts
+   npm: sastrawijs-ts
    Used for: Indonesian word stemming (Nazief-Adriani algorithm) in the
    default `id` pipeline.
 
    Provenance note (research R4): the Sastrawi root-word dictionary is
    derived from the kateglo.com word list, which is published under
-   CC BY-NC-SA 3.0 (non-commercial). sastrawijs itself is distributed under
+   CC BY-NC-SA 3.0 (non-commercial). The package itself is distributed under
    the MIT license. If non-commercial terms are incompatible with a given
    redistribution, the `stem()` contract is engine-agnostic and the root-word
    list can be swapped behind the unchanged API (documented in README,
    "Upstream capabilities").
 
-   Fork provenance note (FR-023, re-plan 2026-10-07): the adopted upstream is
-   the user's fork https://github.com/mlengse/sastrawijs; it is currently
-   consumed via the npm registry package (`sastrawijs`) until that fork is
-   published under a registry scope.
+   Fork provenance note (FR-023): the adopted upstream is the user's fork
+   https://github.com/mlengse/sastrawijs-ts, published to the npm registry as
+   `sastrawijs-ts` (unscoped; the maintainer owns the name). The repository was
+   renamed from `sastrawijs` and the old URL redirects. This replaces the
+   original `sastrawijs@1.1.0` from github.com/damzaky/sastrawijs; stem output
+   is byte-identical across the 67-word golden list.
 
-2. hyphen
+2. hyphenasi
    License: ISC
-   Homepage: https://github.com/ytiurin/hyphen
+   Homepage: https://github.com/mlengse/hyphenasi
+   npm: hyphenasi
    Used for: hyphenation pattern lookups (`id`, `en`) driving the soft-hyphen
-   line-breaking feature. Indonesian and English patterns are sourced from
-   the hyphenation pattern archive distributed with this package.
+   line-breaking feature and the English syllable engine. Indonesian and
+   English patterns are sourced from the hyphenation pattern archive
+   distributed with this package.
 
-   Fork provenance note (FR-023, re-plan 2026-10-07): the adopted upstream is
-   the user's fork https://github.com/mlengse/hyphen; it is currently
-   consumed via the npm registry package (`hyphen`) until that fork ships a
-   publishable package (`@mlengse/hyphen`).
+   Fork provenance note (FR-023): the adopted upstream is the user's fork
+   https://github.com/mlengse/hyphenasi, a fork of
+   https://github.com/ytiurin/hyphen published to the npm registry as
+   `hyphenasi` (unscoped; the maintainer owns the name). The repository was
+   renamed from `hyphen` and the old URL redirects. This replaces the upstream
+   `hyphen@1.14.1`; the fork's KBBI-derived Indonesian patterns are more
+   accurate against the project's PUEBI golden list.
 
 3. minisearch
    License: MIT
@@ -47,9 +55,12 @@ own licenses. Attribution and notices follow.
 4. @mlengse/snowball-js
    License: MPL-1.1
    Homepage: https://github.com/mlengse/snowball-js
+   npm: @mlengse/snowball-js (^1.0.2)
    Used for: English (Snowball / Porter2) stemming when `language: 'en'`.
-   Adopted from the user's fork (FR-023, re-plan 2026-10-07); distributed via
-   the npm registry under the `@mlengse` scope.
+   Adopted from the user's fork (FR-023); distributed via the npm registry
+   under the `@mlengse` scope. Version 1.0.2 fixes the published-`d.ts`
+   (factory declaration) versus CJS-runtime (constructor) mismatch present in
+   1.0.1.
 
 5. stopwords-iso
    License: MIT

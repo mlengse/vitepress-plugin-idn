@@ -22,17 +22,22 @@ writeFileSync(
   ].join('\n'),
 )
 
-// The `hyphen` package (CJS, no `exports` map) only resolves `hyphen/id` /
-// `hyphen/en` through a bundler's directory lookup. Node's ESM resolver (used
-// when VitePress loads the published config) requires the exact file, so the
-// bundled specifiers are rewritten to their explicit `/index.js` subpaths.
+// `hyphenasi` (github.com/mlengse/hyphenasi, FR-023) ships an `exports` map
+// with `"./*": "./*/index.js"`, so `hyphenasi/id` and `hyphenasi/en` resolve
+// under plain Node ESM with no rewrite needed. The old `hyphen` (CJS, no
+// exports map) required rewriting bare directory imports to explicit
+// `/index.js` subpaths; that patch is intentionally gone with the dependency.
+// Kept as an assertion so a future packaging regression fails the build loudly
+// instead of silently emitting an unresolvable dist entry (SC-010).
 for (const file of ['index.js', 'node/index.js']) {
   const path = join(root, 'dist', file)
-  const patched = readFileSync(path, 'utf8').replace(
-    /from (['"])hyphen\/(id|en)\1/g,
-    "from $1hyphen/$2/index.js$1",
-  )
-  writeFileSync(path, patched)
+  const code = readFileSync(path, 'utf8')
+  if (/from (['"])hyphen\//.test(code)) {
+    throw new Error(
+      `${file} still imports the retired 'hyphen' package - expected the ` +
+        `'hyphenasi' fork (FR-023).`,
+    )
+  }
 }
 
-console.log('generated dist/vue.js; patched hyphen subpath imports; copied dist/client/* + dist/vue.d.ts')
+console.log('generated dist/vue.js; verified hyphenasi subpath imports; copied dist/client/* + dist/vue.d.ts')

@@ -1,6 +1,11 @@
 node_modules/
 dist/
-.vitepress/
+# VitePress build/cache output only. The fixture theme under
+# playground/.vitepress/theme/ is source and MUST stay tracked (T025/T031);
+# ignoring the whole .vitepress/ directory hid it and silently dropped those
+# fixtures from the repo.
+.vitepress/cache/
+.vitepress/dist/
 playground/.vitepress/cache/
 playground/.vitepress/dist/
 playground/.bench-src/

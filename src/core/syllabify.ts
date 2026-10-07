@@ -18,7 +18,7 @@
  * - never throws for any input (FR-013)
  */
 
-import enHyphen from 'hyphen/en'
+import enHyphen from 'hyphenasi/en'
 import type { IdnLanguage } from './types'
 
 const hyphenateEnSync = enHyphen.hyphenateSync

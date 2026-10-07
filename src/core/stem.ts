@@ -1,11 +1,11 @@
 import EnglishStemmer, { type Stemmer as EnStemmer } from '@mlengse/snowball-js/english'
-import { Stemmer } from 'sastrawijs'
+import { Stemmer } from 'sastrawijs-ts'
 import type { IdnLanguage } from './types'
 
 /**
- * Engine corrections: cases where sastrawijs returns a wrong or unchanged form
- * for words required by the specification contracts (FR-011, T005 fixture,
- * US1 independent test). Keyed by lowercased input word.
+ * Engine corrections: cases where the stemmer returns a wrong or unchanged
+ * form for words required by the specification contracts (FR-011, T005
+ * fixture, US1 independent test). Keyed by lowercased input word.
  *
  * - `memadamkan`: engine yields `adam` (plain mem+V branch wins over the
  *   p-recoding); contract requires `padam`.
@@ -13,6 +13,10 @@ import type { IdnLanguage } from './types'
  *   s-recoding); contract requires `sapu`.
  * - `pengembangan`: engine leaves the word unchanged; fixture pairs it with
  *   `berkembang`→`kembang`, which the index/query pipeline must join on.
+ *
+ * Re-verified against `sastrawijs-ts@1.0.1` (the user's fork): output is
+ * byte-identical to the previous `sastrawijs@1.1.0` engine across all 67
+ * `tests/fixtures/stem-golden.json` entries, so these corrections still hold.
  */
 const ID_CORRECTIONS: Readonly<Record<string, string>> = {
   memadamkan: 'padam',
@@ -22,12 +26,19 @@ const ID_CORRECTIONS: Readonly<Record<string, string>> = {
 
 const idStemmer = new Stemmer()
 
+/**
+ * The fork's published `dist/languages/english.d.mts` declares
+ * `EnglishStemmer` as a plain factory function while the shipped runtime is a
+ * constructor, so `new EnglishStemmer()` fails typecheck with TS7009. Verified
+ * against `@mlengse/snowball-js@1.0.2`: the mismatch persists, so the cast is
+ * required rather than a leftover of the 1.0.1 packaging bug.
+ */
 const enStemmer = new (EnglishStemmer as unknown as new () => EnStemmer)()
 
 /**
  * Memo of previous results, keyed by `language|lowercased word`. `stem` is a
  * pure, deterministic function, so caching is behavior-transparent while
- * avoiding repeated sastrawijs work for heavily repeated tokens (index + query
+ * avoiding repeated stemmer work for heavily repeated tokens (index + query
  * share the same call, FR-012). The cap resets the cache wholesale when
  * exceeded (watch-mode HMR safety, bounded memory).
  */

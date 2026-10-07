@@ -4,7 +4,11 @@
 
 ## 1. Prerequisites
 
-- Node 18+ / npm 9+
+- Node 20+ / npm 10+ — the adopted Indonesian stemmer `sastrawijs-ts`
+  (github.com/mlengse/sastrawijs-ts) declares `engines.node: ">=20"`, so the
+  package floor moved from the plan's original Node 18+ to Node 20+. Node 18 is
+  EOL (2025-04-30). The fork's shipped bundle is ES2020-only, so this reflects
+  its build toolchain rather than a runtime limitation (T052).
 - Repo: `C:\Users\anjan\dev\vitepress-plugin-idn` (greenfield, branch `master`)
 
 ## 2. Scaffold (one-time)
@@ -12,7 +16,7 @@
 ```powershell
 npm create vite@latest . -- --template vanilla-ts   # if scaffolding over the empty repo
 npm i -D vitest tsup @types/node eslint typescript
-npm i minisearch @mlengse/snowball-js sastrawijs hyphen   # runtime deps (FR-023); snowball-js registry-sourced from the mlengse fork; sastrawijs/hyphen from mlengse forks pending registry publish (@mlengse/sastrawijs, @mlengse/hyphen)
+npm i minisearch @mlengse/snowball-js sastrawijs-ts hyphenasi   # runtime deps (FR-023) — all three language engines are registry-published from the user's mlengse forks
 npm i -D vitepress vue                                # fixture site + peer verification
 ```
 

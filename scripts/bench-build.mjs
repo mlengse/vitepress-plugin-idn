@@ -2,9 +2,22 @@
  * Bench-build (SC-005, FR-020, quickstart §5).
  *
  * Times `vitepress build` WITH the idn plugin vs. a plugin-less baseline on a
- * generated ~140-page Indonesian source set (SC-005 is specified "up to 500
+ * generated ~500-page Indonesian source set (SC-005 is specified "up to 500
  * pages": on a 6-page fixture the plugin's fixed costs dominate the ratio).
- * Asserts plugin overhead <= 20% (best-of-2 after one warm-up build).
+ * Asserts plugin overhead <= 20%.
+ *
+ * Methodological requirements - both variants MUST build the *same* site:
+ *  - Both run against the plain default theme. The fixture's custom theme
+ *    mounts `<AuthorUtils/>`, which imports the plugin's Search.vue and its
+ *    virtual modules; keeping that theme on only one arm charged the plugin
+ *    for fixture-only compile work and made the ratio meaningless.
+ *  - With the plain theme, the plugin still aliases `VPNavBarSearch.vue`, so
+ *    the WITH arm genuinely compiles Search.vue - the difference between the
+ *    arms is the plugin and nothing else.
+ *  - Timing uses the MEDIAN of 3 runs after a warm-up, not best-of-2. The
+ *    baseline build is the noisy arm (it varies ~20-30% run to run on a
+ *    loaded machine) and best-of-N on a noisy sample systematically
+ *    understates the baseline, inflating the overhead ratio.
  *
  * Also builds with `minIndexSizeWarningMB: 0.0001` and asserts the
  * oversized-index warning is emitted (FR-020, quickstart §5.4).
@@ -92,9 +105,9 @@ const ALIASES = `resolve: {
       ],
     }`
 
-// The fixture's custom theme mounts <AuthorUtils/>, which imports the
-// plugin's Search.vue and therefore requires its virtual modules. Only the
-// WITHOUT variant (no plugin) needs a plain default-theme to stay buildable.
+// Both arms build against the plain default theme so the ONLY difference
+// between them is the plugin itself. The WITH arm still exercises the
+// `VPNavBarSearch.vue` alias, so Search.vue is genuinely compiled there.
 const DEFAULT_THEME = `import DefaultTheme from 'vitepress/theme'
 
 export default DefaultTheme
@@ -145,37 +158,53 @@ export default defineConfig({
 `
 
 const variants = [
-  ['without', WITHOUT, true],
-  ['with', WITH, false],
-  ['warn', WARN, false],
+  ['without', WITHOUT],
+  ['with', WITH],
+  ['warn', WARN],
 ]
 
-function buildVariant(name, source, neutralizeTheme) {
+function buildVariant(name, source) {
   writeFileSync(configPath, source)
-  if (neutralizeTheme) writeFileSync(themePath, DEFAULT_THEME)
   const start = performance.now()
   const res = spawnSync(process.execPath, [vitepressBin, 'build', site], {
     cwd: root,
     encoding: 'utf8',
     timeout: 300_000,
   })
-const ms = performance.now() - start
+  const ms = performance.now() - start
   const output = `${res.stdout ?? ''}\n${res.stderr ?? ''}`
-  if (neutralizeTheme) writeFileSync(themePath, originalTheme)
   if (res.error) throw res.error
   if (res.status !== 0) throw new Error(`build variant '${name}' failed (${res.status})\n${output}`)
   return { ms, output }
 }
 
-/** Warm-up once, then best-of-2 (least affected by CPU/OS noise). */
-function bestTime(name, source, neutralizeTheme) {
-  buildVariant(name, source, neutralizeTheme)
-  let best = Infinity
-  for (let i = 0; i < 2; i++) {
-    const { ms } = buildVariant(name, source, neutralizeTheme)
-    if (ms < best) best = ms
+function median(values) {
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+}
+
+/**
+ * Warm-up once, then the MEDIAN of `SAMPLES` timed runs.
+ *
+ * Interleaves the two arms sample-by-sample so a slow patch of machine load
+ * hits both arms equally; taking each arm's median independently would still
+ * let a lull during the baseline window bias the ratio downward.
+ */
+const SAMPLES = 3
+
+function measurePair(withoutSource, withSource) {
+  // Neutralize the fixture theme once for the whole comparison.
+  writeFileSync(themePath, DEFAULT_THEME)
+  buildVariant('warmup', withoutSource)
+  const without = []
+  const withPlugin = []
+  for (let i = 0; i < SAMPLES; i++) {
+    without.push(buildVariant('without', withoutSource).ms)
+    withPlugin.push(buildVariant('with', withSource).ms)
   }
-  return best
+  writeFileSync(themePath, originalTheme)
+  return { baseline: median(without), withPlugin: median(withPlugin) }
 }
 
 const original = readFileSync(configPath, 'utf8')
@@ -184,18 +213,18 @@ let failed = false
 try {
   generateSource()
 
-  const baseline = bestTime(variants[0][0], variants[0][1], variants[0][2])
-  const withPlugin = bestTime(variants[1][0], variants[1][1], variants[1][2])
+  const { baseline, withPlugin } = measurePair(variants[0][1], variants[1][1])
   const overhead = (withPlugin - baseline) / baseline
   const ok = overhead <= 0.2
   if (!ok) failed = true
   console.log(
     `[bench] pages=${PAGE_COUNT} baseline=${(baseline / 1000).toFixed(1)}s ` +
       `with-plugin=${(withPlugin / 1000).toFixed(1)}s ` +
-      `overhead=${(overhead * 100).toFixed(1)}% (${ok ? 'PASS' : 'FAIL'} <=20%, SC-005)`,
+      `overhead=${(overhead * 100).toFixed(1)}% (${ok ? 'PASS' : 'FAIL'} <=20%, SC-005; ` +
+      `median of ${SAMPLES} interleaved samples, same theme both arms)`,
   )
 
-  const warnRun = buildVariant(variants[2][0], variants[2][1], variants[2][2])
+  const warnRun = buildVariant(variants[2][0], variants[2][1])
   const sawWarning =
     warnRun.output.includes('Serialized search index is') && warnRun.output.toLowerCase().includes('warning')
   if (!sawWarning) {

@@ -2,9 +2,11 @@
  * T029 - Hyphenation for line wrapping (FR-016, FR-017, data-model §7).
  *
  * Soft hyphens (`U+00AD`) are inserted at Liang break points produced by the
- * `hyphen` package's `id` / `en` patterns (research R6). The inserted text is
- * invisible until a line break occurs, so the rendered string is unchanged
- * visually.
+ * `hyphenasi` package's `id` / `en` patterns (research R6). `hyphenasi` is the
+ * user's fork of `hyphen` (github.com/mlengse/hyphenasi), adopted per FR-023;
+ * it ships improved Indonesian (KBBI) patterns over the upstream archive. The
+ * inserted text is invisible until a line break occurs, so the rendered string
+ * is unchanged visually.
  *
  * Guarantees (contracts/public-api.md):
  * - only word characters are touched; whitespace, punctuation and URLs
@@ -14,8 +16,8 @@
  * - never throws for any input (FR-013)
  */
 
-import idHyphen from 'hyphen/id'
-import enHyphen from 'hyphen/en'
+import idHyphen from 'hyphenasi/id'
+import enHyphen from 'hyphenasi/en'
 import type { IdnLanguage } from './types'
 
 /** The soft hyphen inserted at break points. */
