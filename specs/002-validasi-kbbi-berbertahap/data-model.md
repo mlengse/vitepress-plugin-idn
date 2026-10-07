@@ -160,6 +160,7 @@ akar referensi berbeda, itu temuan baru dan baris baru dibuat.
   "source": "snapshot",
   "triageNote": "Sufiks -al belum dilepas; awalan me- sudah benar",
   "status": "open",
+  "stage": null,
   "contractLocked": false,
   "firstSeenRun": "stem-m-20261007T204500Z"
 }

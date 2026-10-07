@@ -59,9 +59,8 @@ dikerjakan, diuji, dan dikirim sebagai increment yang berdiri sendiri.
 - [X] T006 [P] Implementasikan `tools/kbbi/report.ts`: tulis dua bentuk keluaran sesuai `contracts/report-format.md` - markdown dan JSONL ke `.kbbi/reports/`. JSONL WAJIB mengurutkan kunci tetap, `null` eksplisit, dan baris terurut `word` menaik (FR-002, FR-014)
 - [X] T007 [P] Tulis `tests/unit/test_kbbi_canonical.test.ts` untuk aturan kanonik `tools/kbbi/corpus.ts`. **WAJIB gagal sebelum T005 diimplementasikan.** Kasus wajib: `"At.lan.tik"` menjadi `at-lan-tik`, `a.has` menjadi `a-has`, `abu-abo` tetap `abu-abo`, `ayam-ayaman` tetap utuh (FR-006)
 - [X] T008 [P] Tulis `tests/unit/test_kbbi_taxonomy.test.ts` untuk taksonomi cacat. **WAJIB gagal sebelum diimplementasikan.** Kasus wajib dari `contracts/defect-taxonomy.md`: jumlah suku kata sama dengan batas berbeda harus menjadi `syllable-boundary-shift`, bukan `syllable-count-diff`; `reference-missing` tidak boleh muncul untuk kata yang ada di kamus pemenggalan (FR-003)
-- [X] T009 Implementasikan `tools/kbbi/compare.ts`: bandingkan bentuk kanonik plugin dengan bentuk kanonik referensi, lalu klasifikasikan memakai urutan taksonomi R9. WAJIBWRITE `accuracy` `null` bila `tested` bernilai nol (FR-016), dan tidak boleh menaikkan `totals.tested + totals.referenceMissing + totals.excluded` dari jumlah kata dalam cakupan
-- [X] T010 Implementasikan `tools/kbbi/cli.ts` dengan perintah `snapshot` dan `measure --capability stem|syllable --scope all|<huruf>`, parsing argumen, dan kode keluar non-nol saat gagal (FR-004)
 - [X] T009 Implementasikan `tools/kbbi/compare.ts`: bandingkan bentuk kanonik plugin dengan bentuk kanonik referensi, lalu klasifikasikan memakai urutan taksonomi R9. **WAJIB** menulis `accuracy` bernilai `null` bila `tested` bernilai nol (FR-016), dan total `tested + referenceMissing + excluded` tidak boleh melebihi jumlah kata dalam cakupan
+- [X] T010 Implementasikan `tools/kbbi/cli.ts` dengan perintah `snapshot` dan `measure --capability stem|syllable --scope all|<huruf>`, parsing argumen, dan kode keluar non-nol saat gagal (FR-004)
 
 **Checkpoint**: Fondasi siap - user story dapat mulai
 
@@ -311,3 +310,10 @@ Dengan beberapa pengembang:
 - **Klarifikasi 2026-10-07 yang tertanam di tugas ini**: KBBI menang atas kontrak
   (T032), onset cluster tidak diperbaiki (T023), pemetaan akar ganda memakai
   entri teratas (T013), verifikasi pencarian dua tingkat (T042, T044)
+
+---
+
+## Phase 9: Convergence
+
+- [X] T056 Perbaiki klaim `--force` yang menyesatkan pada perintah `snapshot` di `tools/kbbi/cli.ts`: entah implementasikan refresh yang benar-benar mengambil ulang (mis. `snapshot --force` yang tetap memanggil `captureSnapshot` meski snapshot sudah ada), atau ganti pesannya agar menunjuk langkah nyata (hapus `.kbbi/snapshot/` lalu jalankan `snapshot`), lalu hapus spread no-op `...(flags['force'] !== undefined ? {} : {})` per US4/AC4 (contradicts)
+- [X] T057 Selaraskan contoh bentuk JSONL di `contracts/report-format.md` dengan keluaran nyata: cantumkan kunci `contractLocked` di antara `stage` dan `firstSeenRun` (dan samakan contoh `data-model.md` §4 yang menghilangkan `stage`), serta dokumentasikan baris kepala `Cakupan` yang disyaratkan FR-014 dan sudah ditulis oleh `tools/kbbi/report.ts` per Constitution I (partial)

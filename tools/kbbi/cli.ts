@@ -44,7 +44,7 @@ import type { Capability, Measurement } from './types.ts'
 const USAGE = `kbbi-validate - pengukuran stem() dan syllabify() terhadap data KBBI
 
 Pakai:
-  kbbi-validate snapshot
+  kbbi-validate snapshot [--force]
   kbbi-validate measure --capability stem|syllable --scope all|<huruf>
   kbbi-validate sample  --capability stem --size 50
   kbbi-validate plan    --capability stem --max 20
@@ -146,14 +146,16 @@ async function currentAccuracy(): Promise<{ stem: number | null; syllable: numbe
 // --- commands ----------------------------------------------------------------
 
 async function commandSnapshot(flags: Record<string, string>): Promise<number> {
-  if (await hasSnapshot()) {
+  // `--force` is the explicit refresh path US4/AC4 refers to: re-take the
+  // dataset even when a checksum-valid snapshot is already present. Without it
+  // an existing valid snapshot is left untouched so measurements stay
+  // comparable and a rerun never silently changes the reference data.
+  const force = flags['force'] !== undefined
+  if (!force && (await hasSnapshot())) {
     log('Snapshot sudah ada dan checksum-nya cocok. Gunakan --force untuk mengambil ulang.')
     return 0
   }
-  const snapshot = await captureSnapshot({
-    log,
-    ...(flags['force'] !== undefined ? {} : {}),
-  })
+  const snapshot = await captureSnapshot({ log })
   log(`Snapshot ${snapshot.tag} tersimpan: ${snapshot.files.length} berkas.`)
   log(
     `Entri: ${snapshot.entryCount.derived} kata turunan, ` +

@@ -27,7 +27,7 @@ Satu baris JSON per temuan. **Tidak** ada baris ringkasan di berkas ini.
 Schema tiap baris ada di `data-model.md` §4.
 
 ```json
-{"word":"memdoctoral","capability":"stem","pluginOutput":"doktor","referenceOutput":"doktoral","class":"affix-strip-missed","stratum":null,"kelasKata":["v"],"source":"snapshot","triageNote":"Sufiks -al belum dilepas","status":"open","stage":null,"firstSeenRun":"stem-m-20261007T204500Z"}
+{"word":"memdoctoral","capability":"stem","pluginOutput":"doktor","referenceOutput":"doktoral","class":"affix-strip-missed","stratum":null,"kelasKata":["v"],"source":"snapshot","triageNote":"Sufiks -al belum dilepas","status":"open","stage":null,"contractLocked":false,"firstSeenRun":"stem-m-20261007T204500Z"}
 ```
 
 ### Aturan JSONL
@@ -73,13 +73,14 @@ Kepala laporan selalu memuat, dalam urutan ini:
 # Pengukuran <kapabilitas> — <cakupan>
 
 - Snapshot: `data-v4` (`4bdde8ad…` + `664e7a99…`)
-- Cardinality: 33268 kata turunan, 11170 kata dasar
+- Cardinality: 33268 kata turunan, 11170 kata dasar, 73768 entri pemenggalan
+- Cakupan: 33268 kata dalam cakupan
 - Dijalankan: 2026-10-07T20:45:00Z → 2026-10-07T20:47:12Z
 - Perkakas: 1
 - Mode: snapshot (tanpa jaringan)
 ```
 
-**Kegagalan wajib**: bila `Snapshot` atau `Cardinality` hilang, laporan dianggap
+**Kegagalan wajib**: bila `Snapshot`, `Cardinality`, atau `Cakupan` hilang, laporan dianggap
 tidak valid. Tanpa tag dan SHA, hasil antar tahap tidak sebanding (R2).
 
 ### Blok angka
