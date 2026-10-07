@@ -69,3 +69,43 @@ own licenses. Attribution and notices follow.
    lists, generated into src/core/stopwords/ by scripts/update-stopwords.ts
    and shipped in the package. The generated files state their source key and
    entry count on the first line.
+
+6. kbbi-harvester-cdn
+   License: ISC
+   Homepage: https://github.com/mlengse/kbbi-harvester-cdn
+   Exact repository consumed: mlengse/kbbi-harvester-cdn at tag `data-v4`.
+   Files consumed by the internal validation toolkit (tools/kbbi/):
+     - lexicon/derived_to_root_with_kelas.json (blob
+       4bdde8ad0cc8df523dc6b1d25558ac9843507afc)
+     - lexicon/derived_to_root.json (blob
+       ead996db97ac3dfe779a6a9393243aa39506c280)
+     - lexicon/root_words.txt (blob
+       4a82a3c134c0b5acd9b9f8c2e55ef656a58063ab)
+     - lexicon/derived_words.txt (blob
+       3e2d1f8c950addb59a90810955f5de2b6a069eaa)
+     - hyphenation/kbbi_vi_hyphenation_dict.json (blob
+       664e7a99966e41af09fa90670b7a1685424c145b)
+     - hyphenation/kbbi_pemenggalan.txt (blob
+       63d66a10bafd27ad7229239dbe26f2cf2cab517f)
+
+   Used for: development-time validation only. `stem()` and `syllabify()` are
+   measured against this data by `node scripts/kbbi-validate.mjs`, and the
+   resulting findings are fixed in this repository's own algorithm.
+
+   NOT BUNDLED. The payload is written to the gitignored `.kbbi/` directory,
+   never to `dist/`, never to `src/`, and never at runtime. `package.json`
+   `files` lists only `dist` and `NOTICE`; no code path reads KBBI data during
+   a build or in the browser. What is committed from this data is only curated
+   word/root pairs in tests/fixtures/kbbi-regression-*.json.
+
+   The data is a derived work of the Indonesian dictionary; the copyright
+   holders of that data differ from the copyright holders of this code. ISC
+   permits use for commercial and non-commercial purposes alike, which is why
+   using it as a comparison source - without redistributing it - is acceptable.
+
+7. kbbi-mcp-server
+   License: ISC
+   Homepage: https://github.com/mlengse/kbbi-mcp-server
+   Used for: optional sampling and cross-checking via the internal validation
+   toolkit (`kbbi-validate sample`). It is not a runtime dependency, not a
+   build dependency, and is never required for a measurement.

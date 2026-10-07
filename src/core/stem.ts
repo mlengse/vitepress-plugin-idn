@@ -27,6 +27,109 @@ const ID_CORRECTIONS: Readonly<Record<string, string>> = {
 const idStemmer = new Stemmer()
 
 /**
+ * Prefixes the engine is expected to remove on its own. Used only by
+ * `stripResidualAffix`, where a leftover prefix means the hypothesis below is
+ * wrong.
+ */
+const DERIVATIONAL_PREFIXES: readonly string[] = [
+  'meng',
+  'meny',
+  'mem',
+  'men',
+  'peng',
+  'peny',
+  'pem',
+  'pen',
+  'ber',
+  'per',
+  'ter',
+  'di',
+  'ke',
+  'se',
+  'me',
+  'pe',
+  'be',
+  'te',
+]
+
+/** Prefixes this module strips itself, longest first. The engine already handles
+ * productive `ber-`; it fails only on the frozen alternants (`berang`, `beran`,
+ * `bereu`) and on the `be-` spellings KBBI also records.
+ */
+const RESIDUAL_PREFIXES: readonly string[] = ['ber', 'be']
+
+/**
+ * Suffixes this module strips itself. `-an` and `-ya`/`-nya` are the ones the
+ * engine declines to commit on; `-kan`, `-i` and the reduplicative suffixes are
+ * left to the engine, which handles them better.
+ */
+const RESIDUAL_SUFFIXES: readonly string[] = ['nya', 'an', 'ya']
+
+/**
+ * Kill switch kept out of the shipped behaviour. It exists so the pre-fix
+ * baseline of stage-01 can be re-measured on demand: the accuracy recorded for
+ * a stage has to stay reproducible, and the only honest way to reproduce it is
+ * to be able to turn the change back off.
+ */
+const STRIP_RESIDUAL_AFFIX = true
+
+/** Is `truncated` a form the engine accepts unchanged, i.e. a plausible root? */
+function isRootLike(truncated: string): boolean {
+  if (truncated.length < 3) return false
+  if (DERIVATIONAL_PREFIXES.some((prefix) => truncated.startsWith(prefix))) return false
+  return idStemmer.stem(truncated) === truncated
+}
+
+/**
+ * Residual affixes, stripped **only when the engine gave up** - that is, when
+ * it returned the word unchanged.
+ *
+ * The engine is better than any rule here at real morphology: it handles `-kan`,
+ * `-i`, reduplication, nasal assimilation and the productive `ber-`. What it
+ * leaves alone are the two places it declines to commit:
+ *
+ * - a bare `-an` derivation: `asupan` stays `asupan` where KBBI roots it `asup`;
+ * - a frozen `ber-`/`be-` alternant: `beraja` stays `beraja` where KBBI roots
+ *   it `raja`.
+ *
+ * Both guards below matter more than the rule itself, and each was measured over
+ * all 33.268 derived words of the pinned `data-v4` snapshot (plus the 73.768
+ * hyphenation entries, which are unaffected because this touches roots only):
+ *
+ * 1. "The engine returned the word unchanged." Without it the rule also fires
+ *    where the engine already did the right thing, and chopping the final `n`
+ *    off `-kan` yields `saksik`, `dempetk`, `asalk` - 19 regressions against 20
+ *    gains.
+ * 2. "The remainder is a plausible root and carries no other prefix." Without
+ *    the prefix test, `bebatuan` becomes `bebatu` when the root is `batu`: the
+ *    `be` there is exactly what the engine failed to strip, and truncating
+ *    hides the failure instead of fixing it. That guard alone removed 1.503
+ *    regressions.
+ *
+ * Measured result: 215 words changed, all 215 now matching KBBI, 0 regressions,
+ * stem accuracy 81,958% -> 82,668% on the derived-word lexicon.
+ *
+ * What it deliberately does not do is guess the rest. The largest remaining
+ * families - nasal assimilation (`memacak` rooted `pacak`), and the residual
+ * `beb-` forms - need lexical knowledge this package may not carry (FR-021),
+ * so they are recorded as known limitations instead (FR-022).
+ */
+function stripResidualAffix(lower: string): string | null {
+  if (!STRIP_RESIDUAL_AFFIX) return null
+  for (const suffix of RESIDUAL_SUFFIXES) {
+    if (!lower.endsWith(suffix)) continue
+    const truncated = lower.slice(0, -suffix.length)
+    if (isRootLike(truncated)) return truncated
+  }
+  for (const prefix of RESIDUAL_PREFIXES) {
+    if (!lower.startsWith(prefix)) continue
+    const truncated = lower.slice(prefix.length)
+    if (isRootLike(truncated)) return truncated
+  }
+  return null
+}
+
+/**
  * The fork's published `dist/languages/english.d.mts` declares
  * `EnglishStemmer` as a plain factory function while the shipped runtime is a
  * constructor, so `new EnglishStemmer()` fails typecheck with TS7009. Verified
@@ -63,7 +166,12 @@ export function stem(word: string, language: IdnLanguage = 'id'): string {
     let result: string
     if (language === 'id') {
       const corrected = ID_CORRECTIONS[lower]
-      result = corrected || idStemmer.stem(lower) || lower
+      if (corrected) {
+        result = corrected
+      } else {
+        const engineResult = idStemmer.stem(lower) || lower
+        result = engineResult === lower ? (stripResidualAffix(lower) ?? engineResult) : engineResult
+      }
     } else {
       enStemmer.setCurrent(lower)
       enStemmer.stem()

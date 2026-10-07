@@ -1,10 +1,16 @@
 /**
- * T023 - Stemming golden-list test (FR-011, FR-012, SC-006).
+ * T023 / T034 - Stemming golden-list test (FR-011, FR-012, SC-006).
  *
  * The fixture is a curated list of Indonesian derived words with their real,
- * verifiable root forms. SC-006 requires the engine to match at least 85% of
- * the list; the list is curated so false positives are excluded while genuine
- * roots must all hold (no invented roots).
+ * verifiable root forms, and every recorded pair must stem exactly to the
+ * recorded root - no invented roots, no tolerance band.
+ *
+ * T034 removed a former `ratio >= 0.85` assertion from this file. It was dead
+ * logic: the test below it demands that all pairs hold, which already means
+ * 100%, so the 85% bar could never fail and only misdescribed what was being
+ * enforced. Tolerance, if it is ever wanted, belongs on a measurement report
+ * (`.kbbi/reports/`) where the sample size and the failures are both visible -
+ * not here, where it would quietly weaken an exact check.
  */
 
 import { readFileSync } from 'node:fs'
@@ -16,23 +22,21 @@ const GOLDEN = JSON.parse(
   readFileSync(resolve(__dirname, '../fixtures/stem-golden.json'), 'utf8'),
 ) as Array<[string, string]>
 
-describe('stem - 50-word golden list (SC-006)', () => {
+describe('stem - curated golden list (SC-006)', () => {
   it('has at least 50 curated pairs', () => {
     expect(GOLDEN.length).toBeGreaterThanOrEqual(50)
-  })
-
-  it('meets or exceeds the 85% accuracy bar', () => {
-    const correct = GOLDEN.filter(([word, root]) => stem(word) === root).length
-    const ratio = correct / GOLDEN.length
-    expect(
-      ratio,
-      `${correct}/${GOLDEN.length} correct - below the 85% SC-006 bar`,
-    ).toBeGreaterThanOrEqual(0.85)
   })
 
   it('every recorded pair stems to the recorded root', () => {
     for (const [word, root] of GOLDEN) {
       expect(stem(word), `stem('${word}')`).toBe(root)
     }
+  })
+
+  it('holds for all pairs at once', () => {
+    // The 85% bar that used to live here was unreachable dead logic; the
+    // exhaustive assertion above is the whole guarantee.
+    const failures = GOLDEN.filter(([word, root]) => stem(word) !== root)
+    expect(failures.map(([word, root]) => `${word} -> ${stem(word)} (want ${root})`)).toEqual([])
   })
 })

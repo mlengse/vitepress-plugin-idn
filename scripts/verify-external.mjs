@@ -33,6 +33,8 @@ if (!existsSync(join(root, 'dist', 'index.js')) || !existsSync(join(root, 'dist'
   process.exit(1)
 }
 
+const vitepressPackageName = 'vitepress-plugin-idn'
+
 const EXTERNAL_CONFIG = `import { defineConfig } from 'vitepress'
 import { idnPlugin } from 'vitepress-plugin-idn/node'
 
@@ -97,6 +99,71 @@ try {
 } finally {
   writeFileSync(configPath, originalConfig)
   writeFileSync(themePath, originalTheme)
+}
+
+// ---------------------------------------------------------------------------
+// T048: package-size and KBBI-data guard (SC-008, FR-018).
+//
+// The KBBI validation toolkit lives under `tools/kbbi/` and writes 4.9 MB of
+// ISC-licensed third-party data into `.kbbi/`. Both must stay out of the
+// published tarball. Nothing about `tsup` or `package.json` `files` is
+// supposed to be able to pull them in, so this is checked rather than assumed:
+// a package that silently grew by 5 MB of dictionary would be a licensing and
+// size regression that no unit test would notice.
+// ---------------------------------------------------------------------------
+{
+  const pack = spawnSync('npm', ['pack', '--dry-run', '--json'], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 300_000,
+    shell: process.platform === 'win32',
+  })
+  if (pack.status !== 0) {
+    failed = true
+    console.error(`[verify:package] npm pack --dry-run gagal: ${pack.stderr ?? ''}`)
+  } else {
+    // npm prints `{ "<name>": { files: [...] } }`, and the key is the package
+    // name rather than the filename - indexing by name is wrong.
+    const parsed = JSON.parse(pack.stdout)
+    const tarball = parsed[vitepressPackageName] ?? parsed[Object.keys(parsed)[0]]
+    const files = tarball?.files ?? []
+    const offenders = []
+    for (const entry of files) {
+      const path = entry.path.replace(/\\/g, '/')
+      if (path.startsWith('.kbbi/') || path.includes('/.kbbi/')) {
+        offenders.push(path)
+        continue
+      }
+      // Any lexicon payload that leaked in would be hundreds of kilobytes of
+      // JSON or a whole dictionary file, so naming them catches the leak even
+      // if the path does not.
+      if (/^(lexicon|hyphenation|word-details)\//.test(path)) offenders.push(path)
+    }
+    if (offenders.length > 0) {
+      failed = true
+      console.error(
+        `[verify:package] data KBBI bocor ke paket: ${offenders.slice(0, 10).join(', ')}`,
+      )
+    } else {
+      console.log(
+        `[verify:package] ${files.length} berkas, ${tarball.unpackedSize} byte tanpa unpack; ` +
+          'tidak ada .kbbi/ maupun lexicon KBBI (SC-008, FR-018)',
+      )
+    }
+  }
+
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+  const files = pkg.files ?? []
+  for (const forbidden of ['.kbbi', 'kbbi', 'lexicon', 'hyphenation']) {
+    if (files.includes(forbidden)) {
+      failed = true
+      console.error(`[verify:package] package.json files memuat "${forbidden}"`)
+    }
+  }
+  if (pkg.dependencies?.['sastrawijs-kbbi']) {
+    failed = true
+    console.error('[verify:package] dependensi runtime KBBI ditambahkan')
+  }
 }
 
 process.exit(failed ? 1 : 0)

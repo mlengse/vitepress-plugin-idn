@@ -4,7 +4,20 @@ import globals from 'globals'
 import vueParser from 'vue-eslint-parser'
 
 export default tseslint.config(
-  { ignores: ['node_modules/**', 'dist/**', '.vitepress/**', 'playground/.vitepress/dist/**', 'playground/.vitepress/cache/**', 'coverage/**'] },
+  {
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      '.vitepress/**',
+      'playground/.vitepress/dist/**',
+      'playground/.vitepress/cache/**',
+      'coverage/**',
+      // T049: the KBBI validation toolkit lives outside the published package,
+      // but it is still linted and typechecked. Only its generated workdir is
+      // ignored - the snapshot data must never reach git or the package.
+      '.kbbi/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

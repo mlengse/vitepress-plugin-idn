@@ -21,3 +21,8 @@ Thumbs.db
 .codegraph/
 .opencode/
 .smoke.mts
+
+# T001 - KBBI validation workdir. Snapshot payload (4.9 MB of ISC-licensed
+# third-party data), measurement reports, the defect store and stage records.
+# Only curated regression pairs are committed, under tests/fixtures/.
+.kbbi/
