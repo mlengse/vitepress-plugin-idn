@@ -147,6 +147,22 @@ Single-package library per plan.md: `src/`, `tests/`, `scripts/`, `playground/` 
 
 ---
 
+## Phase 8: Fork Sourcing Alignment (FR-023 re-plan, 2026-10-07)
+
+**Context**: The feature shipped (T001–T038) against published npm packages. A spec re-plan (Clarifications 2026-10-07 + research R3/R4/R6, data-model §6) now mandates that adopted capabilities be runtime-sourced from the user's own `github.com/mlengse/*` forks (FR-023). This phase aligns the implementation with that decision.
+
+**Note**: switching the `en` stemmer changes index terms for `language:'en'` sites — a full rebuild is required; no `schemaVersion` bump (the FR-020/SC-010 mismatch guard still covers stale chunks).
+
+- [X] T039 Update `package.json` runtime dependencies to fork-sourced packages (FR-023). **PARTIAL — snowball-js done, sastrawijs/hyphen deferred per user decision (2026-10-07, option 1)**: `@mlengse/snowball-js@^1.0.1` (fork-published, npm registry) replaced `stemmer` and is fully wired (npm install green). `github:mlengse/sastrawijs` and `github:mlengse/hyphen` are NOT installable — npm on this machine refuses git deps (`EALLOWGIT`), and neither fork ships installable artifacts (sastrawijs fork has no committed `dist/`; hyphen fork's root package.json is a `private` dev env with no `name`/`main`/`exports`, built output `./package` not committed; `@mlengse/hyphen` not on the registry). Kept on npm registry with README/NOTICE fork-sourcing-pending notes per option 1.
+- [X] T040 [P] Write-test-first `en`-stem contract tests in `tests/contract/test_public_api.test.ts`: 5-word golden set matching `@mlengse/snowball-js` English (Snowball/Porter2) output (`running`→`run`, `horses`→`hors`, `flies`→`fli`, `agreed`→`agre`, `programming`→`program`), `stem('','en')==''`, and a `language:'en'` no-throw batch (FR-013). Verified against the fork: `new EnglishStemmer()` + `setCurrent/stem/getCurrent`.
+- [X] T041 Implement the `en` adapter in `src/core/stem.ts` using `@mlengse/snowball-js/english`; `id` adapter, `ID_CORRECTIONS`, and cache untouched; `stemmer` import dropped. Note: the fork's published d.ts declares a factory while the runtime CJS is a constructor — adapter casts accordingly (`as unknown as new () => Stemmer`).
+- [X] T042 Update `scripts/copy-assets.mjs`: **NO CHANGE REQUIRED** — `@mlengse/snowball-js` ships an `exports` map (`import` condition → real `.mjs`), so dist's `import ... from "@mlengse/snowball-js/english"` resolves under plain Node ESM; the `hyphen` directory-import patch is retained (hyphen still npm for now). Build verified via `npm run build` (exit 0).
+- [X] T043 [P] Update `README.md` "Upstream capabilities" table (FR-023) and the `stem` API comment: snowball-js row is now **Adopted from `github.com/mlengse/snowball-js`** (`@mlengse/snowball-js`, MPL-1.1) for the `en` path — "Dropped. Replaced by stemmer" wording removed; sastrawijs and hyphen rows cite the `mlengse/*` forks as adopted upstreams with fork-publishing-pending notes; minisearch/stopwords-iso stay third-party; kateglo provenance note retained.
+- [X] T044 [P] Update `NOTICE`: `stemmer` entry removed; replaced by `@mlengse/snowball-js` (MPL-1.1, homepage `github.com/mlengse/snowball-js`, used for `en` Snowball/Porter2 stemming); sastrawijs and hyphen entries gained fork-provenance notes (FR-023 re-plan) stating npm-registry consumption until the forks publish; stopwords-iso/minisearch attribution unchanged.
+- [X] T045 Run the full gate suite and record fork-sourcing evidence: `npm run typecheck` (0), `npm run lint` (0), `npm test` (10 files / 91 tests, +7 `en`), `npm run bench` (SC-005 overhead 10.0% PASS ≤20%), `npm run verify:external` (packaged `@mlengse/snowball-js/english` resolves under plain Node ESM). Evidence appended to `specs/001-indonesian-search-plugin/evidence.md` (§ Phase 8 — FR-023 fork sourcing).
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -159,6 +175,7 @@ Single-package library per plan.md: `src/`, `tests/`, `scripts/`, `playground/` 
 - **US3 (Phase 5)**: depends on Foundational only (T007); can run in parallel with US1/US2
 - **US4 (Phase 6)**: depends on Foundational only (T006, T010); can run in parallel with US1/US2/US3
 - **Polish (Phase 7)**: depends on all desired stories; T033/T034 parallel, T037 gates before T038
+- **Fork Sourcing (Phase 8)**: depends on Phase 7 (all stories complete) — re-aligns the shipped implementation's runtime sources to the `mlengse/*` forks per the FR-023 re-plan; T040‖T043‖T044 parallel after T039
 
 ### User Story Dependencies
 
@@ -220,3 +237,12 @@ The two Jev-`high` tasks (T014 index plugin, T016 search modal) sit at the front
 - Every task: checkbox + sequential ID + exact file path; story labels only inside user-story phases.
 - Spec edge cases (mixed digits/punctuation queries, unmapped affixes degrading to prefix match, language-marked pages excluded) are covered by T011/T012 fixtures.
 - Commit after each task or logical group; stop at any checkpoint to validate the story independently.
+- T001–T038 record the shipped feature (all complete) against npm-published dependencies; Phase 8 (T039–T045) is the FR-023 fork-sourcing re-plan delta added on 2026-10-07 — P1/P2/P3/P4 story scoping is unchanged, only runtime sources differ (research R3/R4/R6).
+
+---
+
+## Phase 9: Convergence
+
+- [ ] T046 Source Indonesian stemming from the `sastrawijs` fork at runtime: publish `@mlengse/sastrawijs` to the npm registry (or commit `dist/` to the fork branch), then switch `package.json` dependency from `sastrawijs@^1.1.0` to the fork-published registry package and align `src/core/stem.ts` imports per FR-023 (partial). **BLOCKED (re-checked 2026-10-07): `@mlengse/sastrawijs` E404 on npm; fork master has 0 committed `dist/` files. Re-run when the fork publishes.**
+- [ ] T047 Source hyphenation from the `hyphen` fork at runtime: make the `mlengse/hyphen` fork publishable (`@mlengse/hyphen` with a proper name/main/exports + built `package/`), then switch `package.json` dependency from `hyphen@^1.14.1` to the fork-published registry package, re-verify `scripts/copy-assets.mjs` deep-import patch, and update `README`/`NOTICE` pending notes per FR-023 / research R6 (partial). **BLOCKED (re-checked 2026-10-07): `@mlengse/hyphen` E404 on npm; fork master has 0 committed `package/` entries. Re-run when the fork ships a publishable package.**
+- [X] T048 Update quickstart.md §2 scaffold install to the working dependency set (`npm i minisearch @mlengse/snowball-js sastrawijs hyphen` — registry) with a fork-publishing note for sastrawijs/hyphen runtime sourcing per plan "Adopted sources — fork sourcing" (contradicts)

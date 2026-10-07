@@ -12,7 +12,7 @@
 ```powershell
 npm create vite@latest . -- --template vanilla-ts   # if scaffolding over the empty repo
 npm i -D vitest tsup @types/node eslint typescript
-npm i minisearch sastrawijs snowball-js hyphen
+npm i minisearch @mlengse/snowball-js sastrawijs hyphen   # runtime deps (FR-023); snowball-js registry-sourced from the mlengse fork; sastrawijs/hyphen from mlengse forks pending registry publish (@mlengse/sastrawijs, @mlengse/hyphen)
 npm i -D vitepress vue                                # fixture site + peer verification
 ```
 
@@ -84,7 +84,7 @@ Confirm `import { stem, syllabify } from 'vitepress-plugin-idn'` works from a `.
 
 ## 9. Docs / evidence (FR-023)
 
-README section "Upstream capabilities": for each of sastrawijs, snowball-js, hyphen, stopwords-iso, vitepress-plugin-pagefind, lunr.js — one line on adopted vs. replaced vs. dropped, plus the sastrawijs license note (R4 risk).
+README section "Upstream capabilities": for each of sastrawijs, snowball-js, hyphen, stopwords-iso, vitepress-plugin-pagefind, lunr.js — one line on adopted vs. replaced vs. dropped, plus the sastrawijs license note (R4 risk). Attribution must cite the `mlengse/*` forks as the adopted sources (FR-023 fork sourcing).
 
 ## 10. Definition of done
 

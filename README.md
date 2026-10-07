@@ -97,7 +97,7 @@ it only serves the index, options and the `IdnSearch` component.
 
 ```ts
 import {
-  stem,          // 'berlari' -> 'lari'   (id, Nazief-Adriani / en, Porter)
+  stem,          // 'berlari' -> 'lari'   (id, Nazief-Adriani / en, Snowball)
   syllabify,     // 'pemerintahan' -> 'pe-mer-in-ta-han'
   hyphenateText, // inserts U+00AD soft hyphens at break points
   tokenize,      // lowercase, diacritic-folded, stop-word-free terms
@@ -116,9 +116,9 @@ import {
 
 | Component | Role | Status & reason |
 | --- | --- | --- |
-| [sastrawijs](https://github.com/damzaky/sastrawijs) | Indonesian stemming (Nazief-Adriani) | **Adopted** under MIT. Root-word provenance derives from kateglo.com (CC BY-NC-SA 3.0); this is flagged in `NOTICE`. The `stem()` contract is engine-agnostic, so the dictionary can be swapped behind the unchanged API if a non-commercial term is a blocker. |
-| [snowball-js](https://github.com/fortnightlabs/snowball-js) | Snowball stemmer family | **Dropped.** Replaced by the official [stemmer](https://github.com/words/stemmer) (MIT, Porter) for the `en` path. Snowball's Indonesian rules are weaker than Nazief-Adriani for confix stripping, which is why `id` uses sastrawijs. |
-| [hyphen](https://github.com/ytiurin/hyphen) | Hyphenation patterns (`id`, `en`) | **Adopted** under ISC for the soft-hyphen line-break feature and the English syllable engines. |
+| [snowball-js](https://github.com/mlengse/snowball-js) | Snowball stemmer family | **Adopted from the fork** — consumed as `@mlengse/snowball-js` (MPL-1.1, published from the fork) for the `en` stem path (Snowball English / Porter2). Snowball's Indonesian rules are weaker than Nazief-Adriani for confix stripping, which is why `id` still uses sastrawijs. This re-adopts the engine the interim implementation had swapped for the official `stemmer` (Porter). |
+| [sastrawijs](https://github.com/damzaky/sastrawijs) | Indonesian stemming (Nazief-Adriani) | **Adopted.** Runtime-sourced via the npm registry (`sastrawijs`) for now; FR-023 fork sourcing from the [mlengse fork](https://github.com/mlengse/sastrawijs) is pending fork publishing (`@mlengse/sastrawijs` not yet on the registry). Root-word provenance derives from kateglo.com (CC BY-NC-SA 3.0); this is flagged in `NOTICE`. The `stem()` contract is engine-agnostic, so the dictionary can be swapped behind the unchanged API if a non-commercial term is a blocker. |
+| [hyphen](https://github.com/ytiurin/hyphen) | Hyphenation patterns (`id`, `en`) | **Adopted.** Runtime-sourced via the npm registry (`hyphen`) under ISC for the soft-hyphen line-break feature and the English syllable engines. FR-023 fork sourcing from the [mlengse fork](https://github.com/mlengse/hyphen) is pending a publishable package layout (`@mlengse/hyphen` not yet on the registry). |
 | [stopwords-iso](https://github.com/stopwords-iso/stopwords-iso) | Stop-word lists | **Adopted** (MIT) — the `id`/`en` lists are vendored by `scripts/update-stopwords.ts`, regenerable, and attributed in `NOTICE`. |
 | [vitepress-plugin-pagefind](https://github.com/cpl-coder/vitepress-plugin-pagefind) | External indexer | **Dropped.** Pagefind requires a separate binary and non-static asset pipeline; the spec needs a pure-build, static, same-origin index, which we build in-process instead. |
 | [lunr.js](https://github.com/olivernn/lunr) / lunr-languages | Client search engine | **Dropped.** Replaced by [minisearch](https://github.com/lucaong/minisearch) (MIT), which offers pluggable processing (our stemming and stop-word pipeline) and a compact serialized index. |

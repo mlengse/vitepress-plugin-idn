@@ -32,3 +32,8 @@
 ## Notes
 
 - Iteration 1: 1 clarification raised (FR-008 language scope).`n- Iteration 2: user selected Option B (Indonesian + English, selectable per site); FR-008 and Assumptions updated. All checklist items now pass.
+- Iteration 3: user clarified that all `github.com/mlengse/*` repos in Input are their own forks; Input, Assumptions, and FR-023 updated to require fork-provenance attribution in documentation. Re-validated: all items pass.
+
+## Notes
+
+- FR-023 fork attribution implies downstream documentation work (README "Upstream capabilities" table + `NOTICE`) is expected to cite the `mlengse/*` forks as adopted sources for any adopted capability.

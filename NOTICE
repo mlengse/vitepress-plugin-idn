@@ -21,6 +21,11 @@ own licenses. Attribution and notices follow.
    list can be swapped behind the unchanged API (documented in README,
    "Upstream capabilities").
 
+   Fork provenance note (FR-023, re-plan 2026-10-07): the adopted upstream is
+   the user's fork https://github.com/mlengse/sastrawijs; it is currently
+   consumed via the npm registry package (`sastrawijs`) until that fork is
+   published under a registry scope.
+
 2. hyphen
    License: ISC
    Homepage: https://github.com/ytiurin/hyphen
@@ -28,16 +33,23 @@ own licenses. Attribution and notices follow.
    line-breaking feature. Indonesian and English patterns are sourced from
    the hyphenation pattern archive distributed with this package.
 
+   Fork provenance note (FR-023, re-plan 2026-10-07): the adopted upstream is
+   the user's fork https://github.com/mlengse/hyphen; it is currently
+   consumed via the npm registry package (`hyphen`) until that fork ships a
+   publishable package (`@mlengse/hyphen`).
+
 3. minisearch
    License: MIT
    Homepage: https://github.com/lucaong/minisearch
    Used for: client-side full-text search engine backing the offline search
    index and the setup-free `ui: 'nav'` / `ui: 'external'` search dialog.
 
-4. stemmer
-   License: MIT
-   Homepage: https://github.com/words/stemmer
-   Used for: English (Porter) stemming when `language: 'en'`.
+4. @mlengse/snowball-js
+   License: MPL-1.1
+   Homepage: https://github.com/mlengse/snowball-js
+   Used for: English (Snowball / Porter2) stemming when `language: 'en'`.
+   Adopted from the user's fork (FR-023, re-plan 2026-10-07); distributed via
+   the npm registry under the `@mlengse` scope.
 
 5. stopwords-iso
    License: MIT

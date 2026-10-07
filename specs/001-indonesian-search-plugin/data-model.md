@@ -103,6 +103,7 @@ The word → root association produced by the language stemmer.
 | Never throws; unknown/empty/non-language input returns input (or documented fallback) | FR-013 |
 | Same function used for index and query sides | FR-012 |
 | Example expectations: `berlari→lari`, `memadamkan→padam`, `pemerintahan→perintah` | FR-011, SC-006 |
+| Implemented by adapters over `github.com/mlengse/sastrawijs` (`id`) and `github.com/mlengse/snowball-js` (`en`) | FR-023 fork sourcing |
 
 No persistence: computed on demand in Node (indexing) and browser (query).
 
@@ -126,7 +127,7 @@ Hyphenation (line-breaking) uses `hyphen/id` soft-hyphen insertion and is scoped
 ```text
 PluginOptions ──selects──> language ('id'|'en')
       │                        │
-      │ include/exclude        ├── selects StemMap implementation (stemmer)
+      │ include/exclude        ├── selects StemMap implementation (id: mlengse/sastrawijs, en: mlengse/snowball-js)
       ▼                        ├── selects stop-word list
 IndexedPage ──1..n──> IndexedSection ──terms──> pipeline ──> SearchIndex
                                                      ▲              │

@@ -46,6 +46,25 @@ describe('stem - contract examples', () => {
   }
 })
 
+describe('stem - en contract (snowball-js fork adoption, FR-023)', () => {
+  const enCases: Array<[string, string]> = [
+    ['running', 'run'],
+    ['horses', 'hors'],
+    ['flies', 'fli'],
+    ['agreed', 'agre'],
+    ['programming', 'program'],
+  ]
+  for (const [input, expected] of enCases) {
+    it(`stem('${input}', 'en') = '${expected}'`, () => {
+      expect(stem(input, 'en')).toBe(expected)
+    })
+  }
+
+  it("stem('', 'en') = ''", () => {
+    expect(stem('', 'en')).toBe('')
+  })
+})
+
 describe('syllabify - contract examples', () => {
   it("syllabify('pemerintahan') = 'pe-mer-in-ta-han'", () => {
     expect(syllabify('pemerintahan')).toBe('pe-mer-in-ta-han')
@@ -93,6 +112,12 @@ describe('error contract - never throws (FR-013)', () => {
   it('stem never throws on arbitrary input', () => {
     for (const input of inputs) {
       expect(() => stem(input as never)).not.toThrow()
+    }
+  })
+
+  it("stem(input, 'en') never throws on arbitrary input", () => {
+    for (const input of inputs) {
+      expect(() => stem(input as never, 'en')).not.toThrow()
     }
   })
 

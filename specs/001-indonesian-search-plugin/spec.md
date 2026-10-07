@@ -7,6 +7,8 @@
 **Status**: Draft
 
 **Input**: User description: implementasikan salah satu, beberapa, atau semua dari kapabilitas di repo ini untuk pemenggalan kata, stemming, atau pencarian dalam bahasa Indonesia menjadi sebuah vitepress plugin:
+
+> **Fork provenance (user clarification)**: For the listed repositories, the user maintains their own forks — every `https://github.com/mlengse/*` URL above is the user's own fork (`mlengse` GitHub account). Adopted capabilities therefore originate from the user's maintained forks; documentation (FR-023) and attribution must cite fork provenance rather than assuming the canonical upstream is the adopted source.
 - https://github.com/mlengse/sastrawijs
 - https://github.com/mlengse/hypher
 - https://github.com/mlengse/hyphenation-patterns
@@ -28,6 +30,12 @@ Deliver a VitePress plugin that gives documentation sites first-class Indonesian
 3. **Word syllabification (pemenggalan kata)** — correct Indonesian syllable breaking of words, usable for readable line-breaking/hyphenation and for exposing syllabified text to content.
 
 The listed upstream projects are candidate capability sources; the plugin may adopt one, several, or all of them, or equivalent approaches, as long as the observable behavior in this spec is met.
+
+## Clarifications
+
+### Session 2026-10-07
+
+- Q: For the capabilities the plugin already adopts, should I switch the runtime sources to your own `mlengse/*` forks, or keep the published npm packages and only update the documentation to name your forks as the adopted source lineage? → A: Full fork adoption — every capability that maps to a fork uses the user's fork at runtime; only non-listed capabilities remain third-party.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -144,7 +152,7 @@ A reader views a page with long Indonesian words in narrow columns (sidebars, ta
 - **FR-020**: The plugin MUST NOT break a VitePress build; all failure modes (unsupported content, oversized index, misconfiguration) MUST surface as clear build-time warnings or errors, never silent corruption.
 - **FR-021**: The plugin MUST NOT require network access at build time beyond installing dependencies.
 - **FR-022**: Search UI MUST be keyboard-accessible and usable on narrow (mobile) viewports.
-- **FR-023**: The plugin MUST document which upstream capabilities were adopted and which were replaced with equivalent approaches, and why.
+- **FR-023**: The plugin MUST document which upstream capabilities were adopted and which were replaced with equivalent approaches, and why. Adopted capabilities that map to a listed fork MUST be runtime-sourced from, and attributed with, their fork provenance (`github.com/mlengse/*`) per the user clarification in Input.
 
 ### Key Entities
 
@@ -174,6 +182,7 @@ A reader views a page with long Indonesian words in narrow columns (sidebars, ta
 
 - The target VitePress sites are static-exported documentation sites; no SSR search backend is assumed or required.
 - The listed upstream repositories are optional capability sources — the plugin may bundle, wrap, reimplement, or replace any of them as long as the observable requirements are met; licensing of adopted components must permit redistribution (permissive/open-source license).
+- The `mlengse/*` repositories listed in Input are the user's own forks, maintained under the `mlengse` GitHub account, and are the **adopted runtime source** for the capabilities they map to: Indonesian stemming (`sastrawijs`), hyphenation (`hyphen`), and English stemming (`snowball-js`). Forks already rejected as capability sources (`hypher`, `hyphenation-patterns`, `Hyphenopoly`, `docusaurus-search-local`, `lunr.js`, `lunr-languages`, `stopwords-filter`) remain dropped. Capabilities not present in the fork list (e.g. the search engine implemented over `minisearch`) are adopted third-party. Attribution (FR-023 / NOTICE) must name the fork.
 - Indonesian is the default language; English is the only additional supported language in v1 (see FR-008); all other languages are out of scope.
 - Readers use modern evergreen browsers; legacy browser support (IE11 etc.) is out of scope.
 - Search covers page text content and headings; it does not cover code-comment semantics, images, or PDFs in v1.

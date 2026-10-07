@@ -1,5 +1,5 @@
+import EnglishStemmer, { type Stemmer as EnStemmer } from '@mlengse/snowball-js/english'
 import { Stemmer } from 'sastrawijs'
-import { stemmer as englishStemmer } from 'stemmer'
 import type { IdnLanguage } from './types'
 
 /**
@@ -21,6 +21,8 @@ const ID_CORRECTIONS: Readonly<Record<string, string>> = {
 }
 
 const idStemmer = new Stemmer()
+
+const enStemmer = new (EnglishStemmer as unknown as new () => EnStemmer)()
 
 /**
  * Memo of previous results, keyed by `language|lowercased word`. `stem` is a
@@ -52,7 +54,9 @@ export function stem(word: string, language: IdnLanguage = 'id'): string {
       const corrected = ID_CORRECTIONS[lower]
       result = corrected || idStemmer.stem(lower) || lower
     } else {
-      result = englishStemmer(lower) || lower
+      enStemmer.setCurrent(lower)
+      enStemmer.stem()
+      result = enStemmer.getCurrent() || lower
     }
     if (stemCache.size >= MAX_CACHE) stemCache.clear()
     stemCache.set(key, result)

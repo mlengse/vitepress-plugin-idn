@@ -10,13 +10,21 @@ Deliver a single-install VitePress plugin (`vitepress-plugin-idn`) that adds Ind
 
 - **Architecture (R1)**: a standalone Vite plugin — augmenting VitePress's built-in local search is infeasible (its provider check and `__VP_LOCAL_SEARCH__` define are evaluated before third-party plugin hooks can run). The plugin serves its own search index via a virtual module and injects its search UI by aliasing the default theme's `./VPNavBarSearch.vue` (pattern proven by `vitepress-plugin-pagefind`; `VPNavBar.vue` renders the slot unconditionally).
 - **Indexing (R2)**: re-render Markdown with VitePress's public `createMarkdownRenderer` (verified exported in vitepress 1.6.4) → heading-section records with anchors identical to built pages; works in dev (HMR) and build.
-- **Language pipeline (R4–R6)**: MiniSearch (jev-chosen, 0.91) with one identical pipeline at index and query time: normalize → tokenize → stop words → reduplication reduction → stem (`sastrawijs` for id, `snowball-js` for en). Hyphenation via `hyphen/id` soft hyphens; syllabification by in-package Indonesian CV rules. Language selectable per site, Indonesian default (FR-008, user answer B).
+- **Language pipeline (R4–R6)**: MiniSearch (jev-chosen, 0.91) with one identical pipeline at index and query time: normalize → tokenize → stop words → reduplication reduction → stem (`sastrawijs` for id, `snowball-js` for en — both sourced from the user's `mlengse/*` forks per the FR-023 clarification). Hyphenation via `hyphen/id` soft hyphens (`mlengse/hyphen` fork); syllabification by in-package Indonesian CV rules. Language selectable per site, Indonesian default (FR-008, user answer B).
 
 ## Technical Context
 
 **Language/Version**: TypeScript 5.x (ES2020 output, ESM + `.d.ts`); Node 18+ at build time
 
-**Primary Dependencies**: peer `vitepress ^1.5 || ^1.6`, `vue ^3.3`; runtime `minisearch`, `sastrawijs`, `snowball-js`, `hyphen`; dev `vitest`, `tsup`, `eslint`, `tsc`, fixture `vitepress` site
+**Primary Dependencies**: peer `vitepress ^1.5 || ^1.6`, `vue ^3.3`; runtime `minisearch` (third-party), plus `sastrawijs`, `snowball-js`, `hyphen` **sourced from the user's forks** (`github.com/mlengse/*`); dev `vitest`, `tsup`, `eslint`, `tsc`, fixture `vitepress` site
+
+**Adopted sources — fork sourcing (re-plan 2026-10-07, per spec Clarifications + FR-023)**:
+
+- Indonesian stemming → `github.com/mlengse/sastrawijs`
+- English stemming → `github.com/mlengse/snowball-js` — re-adopts the engine that the current implementation temporarily substituted with the third-party `stemmer` (Porter); that substitution is to be **reverted**, and `en`-stemming parity re-verified under FR-012 / SC-006
+- Hyphenation → `github.com/mlengse/hyphen`
+- Search engine → `minisearch` (third-party — NOT in the fork list)
+- Stop words → vendored third-party `stopwords-iso` data (`mlengse/stopwords-filter` remains rejected)
 
 **Storage**: static assets only — serialized index shipped as a lazily-imported JS chunk; no database (FR-005/FR-021: fully offline)
 
