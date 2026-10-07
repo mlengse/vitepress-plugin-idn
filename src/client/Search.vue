@@ -230,6 +230,7 @@ onBeforeUnmount(() => {
     class="VPNavBarSearch idn-search idn-trigger"
     type="button"
     :aria-label="t.placeholder"
+    aria-haspopup="dialog"
     aria-keyshortcuts="Control+K"
     @click="open"
   >
@@ -266,8 +267,8 @@ onBeforeUnmount(() => {
             class="idn-search-input"
             type="text"
             role="combobox"
-            aria-expanded="true"
-            aria-controls="idn-search-listbox"
+            :aria-expanded="showList ? 'true' : 'false'"
+            :aria-controls="showList ? 'idn-search-listbox' : undefined"
             aria-autocomplete="list"
             :aria-activedescendant="activeOptionId"
             :aria-label="t.placeholder"
@@ -324,6 +325,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   height: 32px;
+  min-height: 40px;
   min-width: 40px;
   padding: 0 10px;
   border: 1px solid var(--vp-c-divider, #e2e2e3);
@@ -419,7 +421,7 @@ onBeforeUnmount(() => {
   outline: none;
   background: transparent;
   color: var(--vp-c-text-1, #213547);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .idn-search-input::placeholder {
@@ -428,6 +430,7 @@ onBeforeUnmount(() => {
 
 .idn-esc {
   height: 24px;
+  min-height: 40px;
   padding: 0 8px;
   border: 1px solid var(--vp-c-divider, #e2e2e3);
   border-radius: 4px;

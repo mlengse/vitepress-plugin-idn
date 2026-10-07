@@ -9,7 +9,6 @@
  * - include-directive content indexed on the including page (R2 gap coverage)
  */
 
-import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -97,6 +96,23 @@ function parseEnvelopeFromChunk(chunk: string): Envelope | null {
   }
 }
 
+function findChunkReferencing(filename: string): string | null {
+  const crawl = (dir: string): string | null => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name)
+      if (entry.isDirectory()) {
+        const found = crawl(full)
+        if (found) return found
+      } else if (entry.name.endsWith('.js')) {
+        const code = readFileSync(full, 'utf8')
+        if (code.includes(filename)) return full
+      }
+    }
+    return null
+  }
+  return crawl(join(DIST, 'assets'))
+}
+
 describe('US1: fixture site build', () => {
   let html: string[] = []
   let chunkPath: string | null = null
@@ -104,18 +120,14 @@ describe('US1: fixture site build', () => {
   let rawChunk = ''
 
   beforeAll(async () => {
-    execSync('npx vitepress build playground', {
-      cwd: ROOT,
-      stdio: 'pipe',
-      timeout: 300_000,
-    })
+    // The fixture site is built once by tests/global-setup.ts.
     html = allHtml(DIST)
     chunkPath = findIndexChunkPath()
     if (chunkPath) {
       rawChunk = readFileSync(chunkPath, 'utf8')
       envelope = parseEnvelopeFromChunk(rawChunk)
     }
-  }, 360_000)
+  })
 
   it('builds the fixture site', () => {
     expect(html.length).toBeGreaterThan(0)
@@ -126,6 +138,20 @@ describe('US1: fixture site build', () => {
     // SSR output: our Search.vue trigger carries the theme's own class plus a
     // stable marker, so the alias firing is visible in the pre-rendered HTML.
     expect(index).toMatch(/VPNavBarSearch|idn-search|Cari/i)
+  })
+
+  it('US2: the index chunk is lazy (not preloaded on the initial page)', () => {
+    expect(chunkPath).not.toBeNull()
+    const filename = chunkPath!.split(/[\\/]/).pop()!
+    const index = readDist('index.html')
+    // Not in the document, so it is neither modulepreloaded nor statically linked (FR-004).
+    expect(index).not.toContain(filename)
+    // Referenced only through a *dynamic* import from another initial chunk.
+    const referencer = findChunkReferencing(filename)
+    expect(referencer, 'no chunk dynamically references the index chunk').not.toBeNull()
+    const code = readFileSync(referencer!, 'utf8')
+    const dynamic = new RegExp(`import\\(\\s*["'\`][^"'\`]*${filename.split('.')[0]}`)
+    expect(dynamic.test(code), 'index chunk must be pulled in via import(), not static link').toBe(true)
   })
 
   it('emits a lazily-loadable index chunk with an envelope', () => {

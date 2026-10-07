@@ -23,6 +23,16 @@ const ID_CORRECTIONS: Readonly<Record<string, string>> = {
 const idStemmer = new Stemmer()
 
 /**
+ * Memo of previous results, keyed by `language|lowercased word`. `stem` is a
+ * pure, deterministic function, so caching is behavior-transparent while
+ * avoiding repeated sastrawijs work for heavily repeated tokens (index + query
+ * share the same call, FR-012). The cap resets the cache wholesale when
+ * exceeded (watch-mode HMR safety, bounded memory).
+ */
+const MAX_CACHE = 20000
+const stemCache = new Map<string, string>()
+
+/**
  * Reduces a word to its root form (FR-011).
  *
  * Pure, synchronous, deterministic, and never throws (FR-013): empty input →
@@ -34,12 +44,19 @@ export function stem(word: string, language: IdnLanguage = 'id'): string {
     if (typeof word !== 'string' || word.length === 0) return ''
     const lower = word.toLowerCase()
     if (lower.length < 3) return lower
+    const key = `${language}|${lower}`
+    const hit = stemCache.get(key)
+    if (hit !== undefined) return hit
+    let result: string
     if (language === 'id') {
       const corrected = ID_CORRECTIONS[lower]
-      if (corrected) return corrected
-      return idStemmer.stem(lower) || lower
+      result = corrected || idStemmer.stem(lower) || lower
+    } else {
+      result = englishStemmer(lower) || lower
     }
-    return englishStemmer(lower) || lower
+    if (stemCache.size >= MAX_CACHE) stemCache.clear()
+    stemCache.set(key, result)
+    return result
   } catch {
     return typeof word === 'string' ? word.toLowerCase() : ''
   }

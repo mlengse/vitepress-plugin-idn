@@ -1,0 +1,48 @@
+vitepress-plugin-idn
+Copyright (c) 2026 vitepress-plugin-idn contributors
+MIT License (see LICENSE)
+
+This product includes third-party software and data distributed under their
+own licenses. Attribution and notices follow.
+
+--------------------------------------------------------------------------
+
+1. sastrawijs
+   License: MIT
+   Homepage: https://github.com/damzaky/sastrawijs
+   Used for: Indonesian word stemming (Nazief-Adriani algorithm) in the
+   default `id` pipeline.
+
+   Provenance note (research R4): the Sastrawi root-word dictionary is
+   derived from the kateglo.com word list, which is published under
+   CC BY-NC-SA 3.0 (non-commercial). sastrawijs itself is distributed under
+   the MIT license. If non-commercial terms are incompatible with a given
+   redistribution, the `stem()` contract is engine-agnostic and the root-word
+   list can be swapped behind the unchanged API (documented in README,
+   "Upstream capabilities").
+
+2. hyphen
+   License: ISC
+   Homepage: https://github.com/ytiurin/hyphen
+   Used for: hyphenation pattern lookups (`id`, `en`) driving the soft-hyphen
+   line-breaking feature. Indonesian and English patterns are sourced from
+   the hyphenation pattern archive distributed with this package.
+
+3. minisearch
+   License: MIT
+   Homepage: https://github.com/lucaong/minisearch
+   Used for: client-side full-text search engine backing the offline search
+   index and the setup-free `ui: 'nav'` / `ui: 'external'` search dialog.
+
+4. stemmer
+   License: MIT
+   Homepage: https://github.com/words/stemmer
+   Used for: English (Porter) stemming when `language: 'en'`.
+
+5. stopwords-iso
+   License: MIT
+   Homepage: https://github.com/stopwords-iso/stopwords-iso
+   Used for: the vendored Indonesian (`id`) and English (`en`) stop-word
+   lists, generated into src/core/stopwords/ by scripts/update-stopwords.ts
+   and shipped in the package. The generated files state their source key and
+   entry count on the first line.

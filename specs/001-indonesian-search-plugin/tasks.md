@@ -68,7 +68,7 @@ Single-package library per plan.md: `src/`, `tests/`, `scripts/`, `playground/` 
 - [X] T015 [US1] Implement src/client/indexLoader.ts: lazy dynamic import of index chunk; on `schemaVersion`/`language` mismatch → visible UI error state + console error, never silent empty results (FR-020, SC-010)
 - [X] T016 [US1] [HIGH] Implement src/client/Search.vue to contracts/search-behavior.md: `role="dialog"` + `aria-modal` + labelled input; `Ctrl/Cmd+K` and `/` open (not while typing); `Esc`/backdrop close with focus restore; `↑`/`↓`/`Enter` over `role="listbox"` with `aria-selected`; focus trap; empty-state and stop-word-only messages (FR-010); `aria-busy` loading; results show title/path/snippet with match highlight (FR-001); 360 px mobile layout (FR-022)
 - [X] T017 [US1] Wire nav-bar injection in src/node/index.ts: `resolve.alias` mapping `./VPNavBarSearch.vue` → src/client/Search.vue (research R1); when alias target not found in theme (non-default theme) → build **warning** suggesting `ui: 'external'` (contracts/plugin-options.md)
-- [ ] T018 [US1] Run fixture dev + build: confirm T011/T012 pass, record SC-001/SC-002 evidence, and quickstart §4 items 1–6
+- [X] T018 [US1] Run fixture dev + build: confirm T011/T012 pass, record SC-001/SC-002 evidence, and quickstart §4 items 1–6
 
 **Checkpoint**: US1 fully functional — this is the MVP (stop here and validate per Implementation Strategy).
 
@@ -82,12 +82,12 @@ Single-package library per plan.md: `src/`, `tests/`, `scripts/`, `playground/` 
 
 ### Tests for User Story 2
 
-- [ ] T019 [US2] Create tests/integration/test_offline_search.test.ts: build fixture → serve dist via plain static server → assert (a) all search assets same-origin, (b) no network beyond static hosting, (c) results returned with external network blocked, (d) index chunk NOT requested on initial page load (lazy: US2 Scenario 2), (e) site HTML content renders with JS disabled (US1 Scenario 5 / progressive enhancement)
+- [X] T019 [US2] Create tests/integration/test_offline_search.test.ts: build fixture → serve dist via plain static server → assert (a) all search assets same-origin, (b) no network beyond static hosting, (c) results returned with external network blocked, (d) index chunk NOT requested on initial page load (lazy: US2 Scenario 2), (e) site HTML content renders with JS disabled (US1 Scenario 5 / progressive enhancement)
 
 ### Implementation for User Story 2
 
-- [ ] T020 [US2] In src/node/searchIndexPlugin.ts ensure index is emitted as a separate lazily-imported chunk (not inlined into entry) via `build.rollupOptions.output.manualChunks` or dynamic-import natural splitting; verify chunk referenced only from src/client/indexLoader.ts
-- [ ] T021 [US2] Run T019 to green and record SC-004 evidence; confirm dev-mode HMR index (FR-006) still works after chunking change via quickstart §4 item 3
+- [X] T020 [US2] In src/node/searchIndexPlugin.ts ensure index is emitted as a separate lazily-imported chunk (not inlined into entry) via `build.rollupOptions.output.manualChunks` or dynamic-import natural splitting; verify chunk referenced only from src/client/indexLoader.ts
+- [X] T021 [US2] Run T019 to green and record SC-004 evidence; confirm dev-mode HMR index (FR-006) still works after chunking change via quickstart §4 item 3
 
 **Checkpoint**: US1 + US2 both independently verified — published-site search is complete.
 
@@ -101,13 +101,13 @@ Single-package library per plan.md: `src/`, `tests/`, `scripts/`, `playground/` 
 
 ### Tests for User Story 3
 
-- [ ] T022 [US3] Create tests/contract/test_public_api.test.ts asserting contracts/public-api.md tables verbatim: `berlari→lari`, `memadamkan→padam`, `pemerintahan→perintah`, `menyukai→suka`; `''→''`; unknown `xyzzy→xyzzy`; mixed-input fuzz batch never throws (FR-013)
-- [ ] T023 [US3] Create tests/fixtures/stem-golden.json (50-word list covering meN-, ber-, peN-, di-, ter-, -kan, -an, -i per SC-006) and tests/unit/test_stem_golden.test.ts asserting ≥85% correctness; include stop-word stem case asserting documented deterministic behavior (US3 AC3)
+- [X] T022 [US3] Create tests/contract/test_public_api.test.ts asserting contracts/public-api.md tables verbatim: `berlari→lari`, `memadamkan→padam`, `pemerintahan→perintah`, `menyukai→suka`; `''→''`; unknown `xyzzy→xyzzy`; mixed-input fuzz batch never throws (FR-013)
+- [X] T023 [US3] Create tests/fixtures/stem-golden.json (50-word list covering meN-, ber-, peN-, di-, ter-, -kan, -an, -i per SC-006) and tests/unit/test_stem_golden.test.ts asserting ≥85% correctness; include stop-word stem case asserting documented deterministic behavior (US3 AC3)
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] Implement src/index.ts public entry exporting `stem(word, language?)`, `tokenize(text, language?)`, `IDN_VERSION` (re-export from src/core, no deep imports required — FR-014); add TSDoc documenting stop-word and unknown-word behavior
-- [ ] T025 [US3] Add fixture theme component playground/.vitepress/theme/AuthorUtils.vue importing `stem` from the package public entry to build a glossary list, and assert it in tests/integration/test_author_utility.test.ts (FR-014 end-to-end)
+- [X] T024 [US3] Implement src/index.ts public entry exporting `stem(word, language?)`, `tokenize(text, language?)`, `IDN_VERSION` (re-export from src/core, no deep imports required — FR-014); add TSDoc documenting stop-word and unknown-word behavior
+- [X] T025 [US3] Add fixture theme component playground/.vitepress/theme/AuthorUtils.vue importing `stem` from the package public entry to build a glossary list, and assert it in tests/integration/test_author_utility.test.ts (FR-014 end-to-end)
 
 **Checkpoint**: US3 independently verified via T022/T023/T025.
 
@@ -121,16 +121,16 @@ Single-package library per plan.md: `src/`, `tests/`, `scripts/`, `playground/` 
 
 ### Tests for User Story 4
 
-- [ ] T026 [US4] Create tests/fixtures/syllabify-golden.json (50-word list per SC-007) and tests/unit/test_syllabify.test.ts: exact expectations `pemerintahan → pe-mer-in-ta-han` (FR-018, US4 AC2), ≥95% golden-list accuracy (SC-007), word shorter than minimum length left intact (US4 AC3)
-- [ ] T027 [US4] Create tests/unit/test_hyphenate.test.ts: soft hyphens (`U+00AD`) inserted only at valid `hyphen/id` break points (FR-016), idempotent re-run, URLs/code-like tokens and `minWordLength` threshold untouched (FR-017, US4 AC3)
+- [X] T026 [US4] Create tests/fixtures/syllabify-golden.json (50-word list per SC-007) and tests/unit/test_syllabify.test.ts: exact expectations `pemerintahan → pe-mer-in-ta-han` (FR-018, US4 AC2), ≥95% golden-list accuracy (SC-007), word shorter than minimum length left intact (US4 AC3)
+- [X] T027 [US4] Create tests/unit/test_hyphenate.test.ts: soft hyphens (`U+00AD`) inserted only at valid `hyphen/id` break points (FR-016), idempotent re-run, URLs/code-like tokens and `minWordLength` threshold untouched (FR-017, US4 AC3)
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Implement src/core/syllabify.ts: Indonesian CV-V, V-V, V-CV, CV-CV rule engine per data-model.md §7; never throws; words < 3 chars returned unchanged
-- [ ] T029 [US4] Implement src/core/hyphenate.ts: Liang algorithm over `hyphen/id` patterns from the `hyphen` package (research R6); language-switchable (`id`/`en`)
-- [ ] T030 [US4] Implement src/client/hyphenationRuntime.ts: runs post-mount (no hydration mismatch), scoped to `hyphenate.selector`; absolute skip list `pre`, `code`, `a`, `.header-anchor`, `[data-no-hyphen]` enforced regardless of selector (FR-017); `minWordLength` respected; idempotent
-- [ ] T031 [US4] Wire `hyphenate` options in src/node/index.ts: when `hyphenate.enabled` inject runtime (script/virtual module) into the VitePress layout; add fixture page with long words in a constrained container and assert valid boundary breaks in tests/integration/test_hyphenation_build.test.ts (US4 AC1)
-- [ ] T032 [US4] Export `syllabify` and `hyphenateText` from src/index.ts (FR-014, FR-018) with TSDoc examples matching contracts/public-api.md
+- [X] T028 [US4] Implement src/core/syllabify.ts: Indonesian CV-V, V-V, V-CV, CV-CV rule engine per data-model.md §7; never throws; words < 3 chars returned unchanged
+- [X] T029 [US4] Implement src/core/hyphenate.ts: Liang algorithm over `hyphen/id` patterns from the `hyphen` package (research R6); language-switchable (`id`/`en`)
+- [X] T030 [US4] Implement src/client/hyphenationRuntime.ts: runs post-mount (no hydration mismatch), scoped to `hyphenate.selector`; absolute skip list `pre`, `code`, `a`, `.header-anchor`, `[data-no-hyphen]` enforced regardless of selector (FR-017); `minWordLength` respected; idempotent
+- [X] T031 [US4] Wire `hyphenate` options in src/node/index.ts: when `hyphenate.enabled` inject runtime (script/virtual module) into the VitePress layout; add fixture page with long words in a constrained container and assert valid boundary breaks in tests/integration/test_hyphenation_build.test.ts (US4 AC1)
+- [X] T032 [US4] Export `syllabify` and `hyphenateText` from src/index.ts (FR-014, FR-018) with TSDoc examples matching contracts/public-api.md
 
 **Checkpoint**: All four user stories independently functional.
 
@@ -138,12 +138,12 @@ Single-package library per plan.md: `src/`, `tests/`, `scripts/`, `playground/` 
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T033 [P] Write README.md + NOTICE: <10-minute default install walkthrough (SC-008), and FR-023 "Upstream capabilities" table — sastrawijs, snowball-js, hyphen, stopwords-iso, vitepress-plugin-pagefind, lunr.js, lunr-languages: adopted/replaced/dropped + reason, including the sastrawijs/kateglo CC-BY-NC-SA license note and mitigation (research R4); notice-files attribution for stopwords-iso (research R5)
-- [ ] T034 [P] Run Lighthouse/axe accessibility audit on the built fixture with search modal open (quickstart §7): zero critical/serious violations, keyboard navigation complete, 360×740 viewport usable with ≥40 px touch targets (SC-008, SC-009, FR-022); fix findings in src/client/Search.vue
-- [ ] T035 Create scripts/bench-build.ts: measure playground build with vs without `idnPlugin()` and assert overhead ≤ 20% (SC-005); also demonstrate oversized-index warning by running with `minIndexSizeWarningMB: 0.0001` (FR-020, quickstart §5.4)
-- [ ] T036 Verify `ui: 'external'` escape hatch: export `<IdnSearch />` from src/vue.ts, mount in fixture, confirm search works without the alias (research R1 residual risk / R9)
-- [ ] T037 Run full toolchain gates: `tsc --noEmit`, `eslint .`, `vitest run` all green (quickstart §10)
-- [ ] T038 Execute quickstart.md §4–§9 end-to-end and record one evidence line per success criterion SC-001…SC-010 for the PR description
+- [X] T033 [P] Write README.md + NOTICE: <10-minute default install walkthrough (SC-008), and FR-023 "Upstream capabilities" table — sastrawijs, snowball-js, hyphen, stopwords-iso, vitepress-plugin-pagefind, lunr.js, lunr-languages: adopted/replaced/dropped + reason, including the sastrawijs/kateglo CC-BY-NC-SA license note and mitigation (research R4); notice-files attribution for stopwords-iso (research R5)
+- [X] T034 [P] Run Lighthouse/axe accessibility audit on the built fixture with search modal open (quickstart §7): zero critical/serious violations, keyboard navigation complete, 360×740 viewport usable with ≥40 px touch targets (SC-008, SC-009, FR-022); fix findings in src/client/Search.vue
+- [X] T035 Create scripts/bench-build.ts: measure playground build with vs without `idnPlugin()` and assert overhead ≤ 20% (SC-005); also demonstrate oversized-index warning by running with `minIndexSizeWarningMB: 0.0001` (FR-020, quickstart §5.4)
+- [X] T036 Verify `ui: 'external'` escape hatch: export `<IdnSearch />` from src/vue.ts, mount in fixture, confirm search works without the alias (research R1 residual risk / R9)
+- [X] T037 Run full toolchain gates: `tsc --noEmit`, `eslint .`, `vitest run` all green (quickstart §10)
+- [X] T038 Execute quickstart.md §4–§9 end-to-end and record one evidence line per success criterion SC-001…SC-010 for the PR description
 
 ---
 

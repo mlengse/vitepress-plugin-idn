@@ -10,7 +10,12 @@ import { existsSync } from 'node:fs'
 import { dirname, join, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Plugin } from 'vite'
-import { RESOLVED_VIRTUAL_ID, VIRTUAL_ID } from '../core/constants'
+import {
+  HYPHENATE_RUNTIME_ID,
+  RESOLVED_HYPHENATE_RUNTIME_ID,
+  RESOLVED_VIRTUAL_ID,
+  VIRTUAL_ID,
+} from '../core/constants'
 import type { IdnPluginOptions, ResolvedIdnOptions } from '../core/types'
 import { getVitePressContext, resolveOptions, warn } from './configResolved'
 import { searchIndexPlugin } from './searchIndexPlugin'
@@ -34,6 +39,17 @@ function resolveSearchVue(): string | null {
   return candidates.find((candidate) => existsSync(candidate)) ?? null
 }
 
+/** Locate the client hyphenation runtime across source/bundled layouts. */
+function resolveHyphenationRuntime(): string | null {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const candidates = [
+    join(here, '..', 'client', 'hyphenationRuntime.ts'),
+    join(here, 'client', 'hyphenationRuntime.ts'),
+    join(here, '..', 'src', 'client', 'hyphenationRuntime.ts'),
+  ]
+  return candidates.find((candidate) => existsSync(candidate)) ?? null
+}
+
 /** Detect VitePress's default-theme nav search (ui: 'nav' alias target). */
 function usesAlgolia(userConfig: Record<string, unknown>): boolean {
   const themeConfig = userConfig.themeConfig as Record<string, unknown> | undefined
@@ -41,10 +57,54 @@ function usesAlgolia(userConfig: Record<string, unknown>): boolean {
   return search?.provider === 'algolia'
 }
 
+/** Normalize an absolute path into a portable Vite import specifier. */
+function toImportSpecifier(path: string): string {
+  return path.replace(/\\/g, '/')
+}
+
+/** Resolve the `@theme` alias to its on-disk directory (T031). */
+function findThemeDir(alias: unknown): string | null {
+  const entries = Array.isArray(alias)
+    ? (alias as { find: unknown; replacement: unknown }[])
+    : Object.entries((alias as Record<string, string> | undefined) ?? {}).map(
+        ([find, replacement]) => ({ find, replacement }),
+      )
+  for (const entry of entries) {
+    if (entry.find === '@theme' && typeof entry.replacement === 'string') {
+      return entry.replacement
+    }
+  }
+  return null
+}
+
+function isThemeIndex(id: string, themeDir: string): boolean {
+  const clean = id.split('?')[0] ?? id
+  const normalized = normalize(clean)
+  const dir = normalize(themeDir)
+  if (!normalized.startsWith(dir)) return false
+  return /[/\\]index\.(?:[cm]?[jt]s)$/.test(normalized)
+}
+
 function corePlugin(options: ResolvedIdnOptions): Plugin {
   let aliasTarget: string | null = null
   let isBuild = false
   let sawSearchVue = false
+  let runtimePath: string | null = null
+  let themeDir: string | null = null
+
+  const hyphenationEnabled = options.hyphenate.enabled
+
+  const runtimeModuleCode = (): string => {
+    const opts = {
+      language: options.language,
+      minWordLength: options.hyphenate.minWordLength,
+      selector: options.hyphenate.selector,
+    }
+    return (
+      `import { installHyphenation } from ${JSON.stringify(toImportSpecifier(runtimePath as string))}\n` +
+      `installHyphenation(${JSON.stringify(opts)})\n`
+    )
+  }
 
   return {
     name: 'vitepress-plugin-idn',
@@ -77,15 +137,50 @@ config() {
             'to avoid two search buttons.',
         )
       }
+      if (hyphenationEnabled) {
+        runtimePath = resolveHyphenationRuntime()
+        themeDir = findThemeDir(config.resolve.alias)
+        if (!runtimePath) {
+          warn(
+            'hyphenate.enabled is true but the client hyphenation runtime could not ' +
+              'be located - client-side hyphenation is disabled.',
+          )
+        }
+      }
+    },
+
+    resolveId(id) {
+      if (hyphenationEnabled && id === HYPHENATE_RUNTIME_ID) {
+        return RESOLVED_HYPHENATE_RUNTIME_ID
+      }
+      return null
+    },
+
+    load(id) {
+      if (id === RESOLVED_HYPHENATE_RUNTIME_ID && runtimePath) return runtimeModuleCode()
+      return null
     },
 
     // Prove the alias actually fired: if Search.vue never enters the module
     // graph, the theme does not import './VPNavBarSearch.vue' (custom theme
-    // or a renamed specifier - R1 residual risk).
-    transform(_code, id) {
-      if (!isBuild || !aliasTarget) return null
+    // or a renamed specifier - R1 residual risk). Also injects the
+    // hyphenation runtime into the theme entry (T031).
+    transform(code, id) {
       const clean = id.split('?')[0] ?? id
-      if (normalize(clean) === normalize(aliasTarget)) sawSearchVue = true
+      if (isBuild && aliasTarget && normalize(clean) === normalize(aliasTarget)) {
+        sawSearchVue = true
+      }
+      if (
+        hyphenationEnabled &&
+        runtimePath &&
+        themeDir &&
+        isThemeIndex(clean, themeDir)
+      ) {
+        return {
+          code: `${code}\nimport ${JSON.stringify(HYPHENATE_RUNTIME_ID)}\n`,
+          map: null,
+        }
+      }
       return null
     },
 

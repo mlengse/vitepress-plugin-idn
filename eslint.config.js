@@ -4,7 +4,7 @@ import globals from 'globals'
 import vueParser from 'vue-eslint-parser'
 
 export default tseslint.config(
-  { ignores: ['node_modules/**', 'dist/**', 'playground/.vitepress/dist/**', 'playground/.vitepress/cache/**', 'coverage/**'] },
+  { ignores: ['node_modules/**', 'dist/**', '.vitepress/**', 'playground/.vitepress/dist/**', 'playground/.vitepress/cache/**', 'coverage/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

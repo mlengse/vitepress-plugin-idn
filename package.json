@@ -31,7 +31,8 @@
     "playground:dev": "vitepress dev playground",
     "playground:build": "vitepress build playground",
     "playground:preview": "vitepress preview playground",
-    "bench": "node scripts/bench-build.mjs"
+    "bench": "node scripts/bench-build.mjs",
+    "verify:external": "npm run build && node scripts/verify-external.mjs"
   },
   "peerDependencies": {
     "vitepress": "^1.5.0 || ^1.6.0",

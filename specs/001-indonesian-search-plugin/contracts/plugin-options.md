@@ -7,13 +7,16 @@
 ```ts
 // .vitepress/config.ts
 import { defineConfig } from 'vitepress'
-import { idnPlugin } from 'vitepress-plugin-idn'
+import { idnPlugin } from 'vitepress-plugin-idn/node' // Node/Vite entry
 
 export default defineConfig({
   vite: {
     plugins: [idnPlugin()] // ← the only required line; all options optional
   }
 })
+
+// The root entry ('vitepress-plugin-idn') is the client-safe utility entry
+// and does not expose the Node plugin.
 ```
 
 **Guarantees**

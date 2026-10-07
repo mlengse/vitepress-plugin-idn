@@ -1,7 +1,9 @@
 node_modules/
 dist/
+.vitepress/
 playground/.vitepress/cache/
 playground/.vitepress/dist/
+playground/.bench-src/
 coverage/
 *.log
 .env*
