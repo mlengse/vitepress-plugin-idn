@@ -189,6 +189,16 @@ export const FAILURE_CLASSES: ReadonlySet<DefectClass> = new Set<DefectClass>([
   'candidate-bug',
 ])
 
+/**
+ * Classes that never count as failures and can never enter a fix stage.
+ * These are closed via triage (dismiss with reason), not via code fixes.
+ */
+export const NON_FAILURE_CLASSES: ReadonlySet<DefectClass> = new Set<DefectClass>([
+  'reference-missing',
+  'data-divergence',
+  'root-word-self',
+])
+
 export function countsFailure(defectClass: DefectClass): boolean {
   return FAILURE_CLASSES.has(defectClass)
 }

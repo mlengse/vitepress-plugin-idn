@@ -265,6 +265,29 @@ di jalur ini (R7). Test `tests/unit/test_kbbi_search_regression.test.ts` selalu
 menyertakan pemeriksaan cepat tingkat 1 (FR-019), sehingga tidak perlu build
 tambahan.
 
+## Langkah 14 - Tutup temuan non-kegagalan dan nyatakan selesai
+
+Temuan berkelas `reference-missing`, `data-divergence`, dan `root-word-self`
+tidak bisa masuk tahap perbaikan (bukan kegagalan). Tutup temuan seperti itu
+dengan perintah `triage` beserta alasan, tanpa membuat tahap (FR-022):
+
+```bash
+node scripts/kbbi-validate.mjs triage \
+  --capability syllable \
+  --class reference-missing \
+  --reason "Kata tidak ditemukan di kamus pemenggalan KBBI. Bukan kegagalan plugin."
+```
+
+Perintah `triage` menolak dijalankan tanpa `--reason`. Bentuk perintah lengkap,
+parameter, dan aturan penolakannya ada di
+`specs/003-close-validation-workflow/contracts/triage-command.md`.
+
+Spec 002 dinyatakan **selesai** bila seluruh temuan berstatus `fixed` atau
+`dismissed` (tidak ada temuan `open`), dan akurasi terakhir tercatat sebagai
+plafon terakhir. SC-001/SC-002 adalah plafon yang dikejar, bukan gerbang
+penghalang. Kriteria selesai lengkap ada di bagian **Kriteria Selesai** pada
+`spec.md`.
+
 ## Pengukuran opsional lewat MCP
 
 Bila tool MCP `kbbi-mcp-server` dikonfigurasi:
@@ -294,7 +317,8 @@ MCP, jadi ketidakhadirannya tidak memengaruhi hasil pengukuran lain.
 | `plan` | Tidak | Membentuk tahap dari temuan terbuka yang masih tereproduksi. |
 | `record` | Tidak | Mencatat hasil satu gerbang manual. |
 | `verify` | Tidak | Menjalankan G1-G3 sebuah tahap. |
-| `dismiss` | Tidak | Menutup temuan dengan alasan teknis tercatat (FR-022). |
+| `dismiss` | Tidak | Menutup temuan **di dalam tahap** dengan alasan teknis tercatat (FR-022). |
+| `triage` | Tidak | Menutup temuan non-kegagalan tanpa keanggotaan tahap, dengan alasan tercatat. |
 | `promote` | Tidak | Menandai temuan jadi kasus regresi. |
 | `revert` | Tidak | Mengembalikan temuan tahap ke `open`. |
 | `status` | Tidak | Menampilkan akurasi terakhir tiap kapabilitas dan daftar tahap. |
@@ -326,3 +350,4 @@ MCP, jadi ketidakhadirannya tidak memengaruhi hasil pengukuran lain.
 | `contracts/report-format.md` | Bentuk laporan md dan JSONL |
 | `contracts/defect-taxonomy.md` | Taksonomi cacat dan aturan triase |
 | `contracts/stage-workflow.md` | Gerbang G1-G3 dan siklus tahap |
+| `../003-close-validation-workflow/contracts/triage-command.md` | Perintah `triage` untuk menutup temuan non-kegagalan |

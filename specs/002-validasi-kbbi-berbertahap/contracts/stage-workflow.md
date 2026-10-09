@@ -43,6 +43,22 @@ Lokasi: `.kbbi/stages/<id>.json`.
 3. Hanya temuan dengan `class` yang dihitung kegagalan boleh masuk tahap.
    `data-divergence` ditutup lewat triase, bukan lewat perbaikan kode (FR-022).
 
+## Penutupan temuan non-kegagalan lewat triase
+
+**Amendmen 2026-10-10.** Ditambahkan oleh feature `003-close-validation-workflow`
+(FR-001, FR-002) lewat proses amendmen spec.
+
+Kelas `reference-missing`, `data-divergence`, dan `root-word-self` tidak pernah
+dihitung sebagai kegagalan, sehingga tidak pernah masuk tahap perbaikan kode dan
+tidak punya `stage`. Temuan seperti itu ditutup lewat perintah `triage`, yang
+tidak mensyaratkan keanggotaan tahap (`stage: null`) selama alasannya tercatat
+(FR-022, SC-011).
+
+`dismiss` yang lama tetap berlaku hanya untuk temuan yang **di dalam** sebuah
+tahap; `triage` adalah jalur penutup untuk temuan yang tidak pernah masuk tahap.
+Bentuk perintah, parameter, dan aturan penolakannya ditetapkan di
+`specs/003-close-validation-workflow/contracts/triage-command.md`.
+
 ## Gerbang kelulusan (FR-010)
 
 `status = "passed"` hanya bila **ketiganya** terpenuhi:
@@ -131,6 +147,7 @@ menyelesaikan tahap secara otomatis (Batasan Cakupan di spec).
 | `plan` | Membuat tahap dari N temuan terbuka. |
 | `verify` | Menjalankan gerbang G1-G3 dan menulis status. |
 | `promote` | Menandai temuan jadi kasus regresi, hanya bila tahap `passed`. |
+| `triage` | Menutup temuan non-kegagalan tanpa keanggotaan tahap, dengan alasan tercatat. |
 | `revert` | Mengembalikan temuan tahap ke `open` bila tahap `failed`. |
 | `record` | Menulis hasil verifikasi manual (lint, typecheck, test). |
 

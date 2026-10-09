@@ -340,6 +340,32 @@ Sebagai pembaca situs dokumentasi, saya ingin perbaikan kata dasar dan pemenggal
 - Pengguna akhir paket, yaitu penulis situs dan pembaca dokumentasi, tidak pernah melihat instrumentation ini; seluruhnya bersifat internal repositori.
 - **Keputusan runtime (2026-10-07): data KBBI hanya diperlakukan sebagai sumber pembanding, tidak pernah menjadi kamus akar kata runtime.** Alasannya, jaminan spec 001 bahwa situs statis tetap berfungsi offline tanpa layanan tambahan dianggap lebih penting daripada akurasi akar kata yang mendekati sempurna. Konsekuensinya, SC-001 dan SC-002 adalah plafon yang dikejar oleh algoritma, bukan langkah menuju penyelesaian; selisih yang tidak bisa dijelaskan algoritma dicatat sebagai keterbatasan diketahui melalui FR-022.
 
+## Kriteria Selesai (Completion Criterion)
+
+**Amendmen 2026-10-10.** Ditambahkan oleh feature
+`003-close-validation-workflow` (FR-004, FR-005) melalui proses amendmen spec.
+Perubahan ini menyelesaikan ketegangan antara SC-011 (nol temuan terbuka tanpa
+penjelasan) dan butir §Assumptions §341 (akurasi sebagai plafon). Isi asli spec
+002 tidak dihapus; bagian ini bersifat aditif.
+
+Spec 002 dinyatakan **selesai** bila **kedua** kondisi berikut terpenuhi:
+
+1. **Semua temuan tertutup.** Setiap temuan di `.kbbi/defects/open.jsonl`
+   berstatus `fixed` atau `dismissed`, dan setiap penutupan menyimpan alasan
+   yang tercatat (FR-022). Tidak ada temuan berstatus `open`. Temuan
+   non-kegagalan (`reference-missing`, `data-divergence`, `root-word-self`)
+   ditutup lewat perintah `triage`, bukan lewat tahap perbaikan.
+2. **Akurasi terakhir tercatat.** Akurasi `stem` dan `syllable` terakhir yang
+   diukur dicatat pada riwayat pengukuran sebagai plafon terakhir.
+
+SC-001 (98%) dan SC-002 (97%) adalah **plafon yang dikejar** algoritma, bukan
+gerbang penghalang penyelesaian. Bila semua temuan sudah tertutup tetapi akurasi
+masih di bawah target, spec tetap dapat dinyatakan selesai selama akurasi
+terakhir tercatat beserta alasan teknis sisa selisihnya (FR-022, SC-012).
+
+Bentuk perintah penutup temuan non-kegagalan ditetapkan di
+`specs/003-close-validation-workflow/contracts/triage-command.md`.
+
 ## Batasan Cakupan *(Out of Scope)*
 
 - Menambah kapabilitas bahasa baru di luar cakupan spec 001.

@@ -27,19 +27,23 @@ import {
   SEARCH_UNIT_GATE,
   StageError,
   dismissStageFindings,
+  isStillReproducing,
   listStageIds,
   loadRegressionCases,
   loadStage,
   planStage,
   promoteStage,
+  reconcileNonReproducing,
   recordGate,
   revertStage,
   runRegressionCases,
   runSearchJoinGate,
+  triageNonFailureFindings,
   verifyStage,
 } from './stages.ts'
+import { NON_FAILURE_CLASSES } from './compare.ts'
 import { SnapshotError, captureSnapshot, hasSnapshot, loadSnapshot } from './snapshot.ts'
-import type { Capability, Measurement } from './types.ts'
+import type { Capability, Defect, Measurement } from './types.ts'
 
 const USAGE = `kbbi-validate - pengukuran stem() dan syllabify() terhadap data KBBI
 
@@ -52,6 +56,7 @@ Pakai:
   kbbi-validate record  --stage stage-01 --gate "npm test" --result pass|fail
   kbbi-validate promote --stage stage-01 [--contract-updated <berkas>]
   kbbi-validate dismiss --stage stage-01 --word "a,b" --reason "alasan teknis"
+  kbbi-validate triage  --capability stem|syllable --class <kelas> [--word "a,b"] --reason "alasan"
   kbbi-validate revert  --stage stage-01 --reason "alasan"
   kbbi-validate status
   kbbi-validate --help
@@ -238,7 +243,11 @@ async function commandMeasure(flags: Record<string, string>): Promise<number> {
 
   const store = await loadDefectStore()
   const { merged, added } = mergeDefects(store, result.defects)
-  await writeDefectStore(merged)
+  // FR-001/SC-001 (T017): a measurement is the moment the code's current output
+  // is known, so it is where a failure finding that no longer reproduces is
+  // reconciled to `fixed`. Otherwise that finding keeps `open` with no closure path.
+  const { reconciled, fixed } = reconcileNonReproducing(merged)
+  await writeDefectStore(reconciled)
 
   const { totals, accuracy } = result.measurement
   log(`${capability} ${scope}: diuji ${totals.tested}, cocok ${totals.matched}, berbeda ${totals.mismatched}`)
@@ -257,7 +266,10 @@ async function commandMeasure(flags: Record<string, string>): Promise<number> {
   }
   log(`Laporan: ${paths.markdown}`)
   log(`JSONL:   ${paths.jsonl}`)
-  log(`Temuan baru ditambahkan ke store: ${added} (total ${merged.length})`)
+  log(`Temuan baru ditambahkan ke store: ${added} (total ${reconciled.length})`)
+  if (fixed.length > 0) {
+    log(`Temuan yang tidak lagi direproduksi ditandai fixed: ${fixed.length}`)
+  }
   return 0
 }
 
@@ -368,6 +380,34 @@ async function commandDismiss(flags: Record<string, string>): Promise<number> {
   return 0
 }
 
+async function commandTriage(flags: Record<string, string>): Promise<number> {
+  const capability = parseCapability(requireFlag(flags, 'capability'))
+  const rawClass = requireFlag(flags, 'class')
+  if (!NON_FAILURE_CLASSES.has(rawClass as never)) {
+    throw new CliError(
+      `--class harus salah satu dari ${[...NON_FAILURE_CLASSES].join(', ')}, bukan "${rawClass}".`,
+    )
+  }
+  const words = flags['word']
+    ? flags['word']
+        .split(',')
+        .map((word) => word.trim())
+        .filter(Boolean)
+    : undefined
+  const reason = requireFlag(flags, 'reason')
+  const dismissed = await triageNonFailureFindings({
+    capability,
+    class: rawClass as 'reference-missing' | 'data-divergence' | 'root-word-self',
+    words,
+    reason,
+  })
+  log(
+    `${dismissed.length} temuan non-kegagalan ditutup dengan triase tercatat: ` +
+      dismissed.map((defect) => defect.word).join(', '),
+  )
+  return 0
+}
+
 async function commandRevert(flags: Record<string, string>): Promise<number> {
   const id = requireFlag(flags, 'stage')
   const reason = requireFlag(flags, 'reason')
@@ -375,6 +415,19 @@ async function commandRevert(flags: Record<string, string>): Promise<number> {
   const { withdrawn } = await revertStage(stage, reason)
   log(`${stage.id}: ${withdrawn.length} kasus regresi ditarik dengan alasan tercatat.`)
   return 0
+}
+
+/**
+ * FR-001 (US1/AC4, SC-001): a finding has a valid CLI closure path when it is a
+ * non-failure class (closed via `triage`), is already attached to a stage, or is
+ * a failure class that still reproduces (closed via the stage workflow). A
+ * failure class that no longer reproduces is the one case without an executable
+ * path, so `status` counts it as "tanpa jalur penutup".
+ */
+function hasClosurePath(defect: Defect): boolean {
+  if (defect.stage !== null) return true
+  if (NON_FAILURE_CLASSES.has(defect.class)) return true
+  return isStillReproducing(defect)
 }
 
 /**
@@ -394,6 +447,16 @@ async function commandStatus(): Promise<number> {
   }
   const stages = await listStageIds()
   log(`tahap     : ${stages.length > 0 ? stages.join(', ') : '(belum ada)'}`)
+
+  // FR-001, SC-001, US1/AC4: every open finding must have a valid closure path,
+  // and `status` is where that is checked. Splitting the open store into findings
+  // that can be closed and those that cannot makes the guarantee observable.
+  const open = (await loadDefectStore()).filter((defect) => defect.status === 'open')
+  const withoutPath = open.filter((defect) => !hasClosurePath(defect))
+  log(
+    `temuan    : ${open.length} terbuka, ${open.length - withoutPath.length} punya jalur penutup, ` +
+      `${withoutPath.length} tanpa jalur penutup`,
+  )
   return 0
 }
 
@@ -421,6 +484,8 @@ export async function runCli(argv: readonly string[]): Promise<number> {
         return await commandPromote(flags)
       case 'dismiss':
         return await commandDismiss(flags)
+      case 'triage':
+        return await commandTriage(flags)
       case 'revert':
         return await commandRevert(flags)
       case 'status':

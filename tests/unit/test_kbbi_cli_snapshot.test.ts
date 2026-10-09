@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   hasSnapshot: vi.fn(),
   captureSnapshot: vi.fn(),
   loadSnapshot: vi.fn(),
+  loadDefectStore: vi.fn(),
+  isStillReproducing: vi.fn(),
 }))
 
 vi.mock('../../tools/kbbi/snapshot.ts', () => ({
@@ -22,6 +24,16 @@ vi.mock('../../tools/kbbi/snapshot.ts', () => ({
   loadSnapshot: mocks.loadSnapshot,
   SnapshotError: class SnapshotError extends Error {},
 }))
+
+vi.mock('../../tools/kbbi/compare.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../tools/kbbi/compare.ts')>()
+  return { ...actual, loadDefectStore: mocks.loadDefectStore }
+})
+
+vi.mock('../../tools/kbbi/stages.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../tools/kbbi/stages.ts')>()
+  return { ...actual, isStillReproducing: mocks.isStillReproducing }
+})
 
 import { runCli } from '../../tools/kbbi/cli.ts'
 
@@ -44,7 +56,11 @@ beforeEach(() => {
   mocks.hasSnapshot.mockReset()
   mocks.captureSnapshot.mockReset()
   mocks.loadSnapshot.mockReset()
+  mocks.loadDefectStore.mockReset()
+  mocks.isStillReproducing.mockReset()
   mocks.captureSnapshot.mockResolvedValue(FAKE_SNAPSHOT)
+  mocks.loadDefectStore.mockResolvedValue([])
+  mocks.isStillReproducing.mockReturnValue(false)
   // commandSnapshot logs progress; keep the test output readable.
   vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 })
@@ -77,5 +93,67 @@ describe('snapshot --force (T056, US4/AC4, FR-011)', () => {
     mocks.captureSnapshot.mockClear()
     expect(await runCli(['snapshot', '--force'])).toBe(0)
     expect(mocks.captureSnapshot).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('triage command is advertised (T005, US1, FR-001)', () => {
+  it('lists the triage usage line in --help output', async () => {
+    const writes: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      writes.push(String(chunk))
+      return true
+    })
+
+    expect(await runCli(['--help'])).toBe(0)
+    expect(writes.join('')).toContain('kbbi-validate triage')
+  })
+})
+
+describe('status reports closure-path coverage (T015, US1/AC4, SC-001, FR-001)', () => {
+  const capture = (): string[] => {
+    const writes: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      writes.push(String(chunk))
+      return true
+    })
+    return writes
+  }
+
+  it('splits open findings into those with a closure path and those without', async () => {
+    mocks.loadDefectStore.mockResolvedValue([
+      // Non-failure class, no stage -> path via `triage`.
+      { word: 'kata1', capability: 'syllable', class: 'reference-missing', status: 'open', stage: null },
+      // Failure class that still reproduces -> path via the stage workflow.
+      { word: 'kata2', capability: 'stem', class: 'candidate-bug', status: 'open', stage: null },
+      // Failure class that no longer reproduces -> the one case with no path.
+      { word: 'kata3', capability: 'stem', class: 'candidate-bug', status: 'open', stage: null },
+      // Already closed -> never counted as open.
+      { word: 'kata4', capability: 'stem', class: 'candidate-bug', status: 'dismissed', stage: null },
+    ])
+    mocks.isStillReproducing.mockImplementation(
+      (defect: { word: string }) => defect.word !== 'kata3',
+    )
+
+    const writes = capture()
+    expect(await runCli(['status'])).toBe(0)
+
+    const output = writes.join('')
+    expect(output).toContain('3 terbuka')
+    expect(output).toContain('2 punya jalur penutup')
+    expect(output).toContain('1 tanpa jalur penutup')
+  })
+
+  it('reports zero without-path findings when every open finding is closable', async () => {
+    mocks.loadDefectStore.mockResolvedValue([
+      { word: 'kata1', capability: 'syllable', class: 'reference-missing', status: 'open', stage: null },
+    ])
+    mocks.isStillReproducing.mockReturnValue(true)
+
+    const writes = capture()
+    expect(await runCli(['status'])).toBe(0)
+
+    const output = writes.join('')
+    expect(output).toContain('1 terbuka')
+    expect(output).toContain('0 tanpa jalur penutup')
   })
 })

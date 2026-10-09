@@ -452,6 +452,36 @@ export function isStillReproducing(defect: Defect): boolean {
 }
 
 /**
+ * FR-001/SC-001 (T017): an open failure-class finding the current code no longer
+ * reproduces has no closure path anywhere else - `planStage` only selects
+ * still-reproducing findings, `triage` handles non-failure classes only, and
+ * `dismiss` requires stage membership. Left alone it stays `open` forever, so
+ * `measure` reconciles it to `fixed`, the same end state `promote` records.
+ *
+ * The reproduction predicate is injectable so the mapping is testable without
+ * invoking the stemmer; the default is the real check.
+ */
+export function reconcileNonReproducing(
+  defects: readonly Defect[],
+  reproduces: (defect: Defect) => boolean = isStillReproducing,
+): { reconciled: Defect[]; fixed: string[] } {
+  const fixed: string[] = []
+  const reconciled = defects.map((defect) => {
+    if (
+      defect.status === 'open' &&
+      defect.stage === null &&
+      countsFailure(defect.class) &&
+      !reproduces(defect)
+    ) {
+      fixed.push(defect.word)
+      return { ...defect, status: 'fixed' as const }
+    }
+    return defect
+  })
+  return { reconciled, fixed }
+}
+
+/**
  * `plan --capability X --max N`: pick the highest-signal open findings, honouring
  * the 20-per-stage cap and the failure-only rule. Order is deterministic -
  * alphabetical by word - so a re-plan over unchanged findings yields the same
@@ -583,6 +613,69 @@ export async function dismissStageFindings(
   }
   await writeDefectStore(updated)
   return dismissed
+}
+
+/**
+ * Pure filter: which non-failure findings match the triage criteria.
+ * Separated from file I/O so it is unit-testable without mocking the store.
+ */
+export function filterNonFailureDefects(
+  defects: readonly Defect[],
+  input: {
+    capability: Capability
+    class: DefectClass
+    words?: readonly string[]
+  },
+): Defect[] {
+  const wanted = input.words && input.words.length > 0 ? new Set(input.words) : null
+  return defects.filter(
+    (defect) =>
+      defect.capability === input.capability &&
+      defect.class === input.class &&
+      defect.status === 'open' &&
+      defect.stage === null &&
+      (wanted === null || wanted.has(defect.word)),
+  )
+}
+
+/**
+ * Close non-failure findings without requiring stage membership.
+ *
+ * Non-failure classes (`reference-missing`, `data-divergence`, `root-word-self`)
+ * can never enter a fix stage (`planStage` filters by `countsFailure`), and
+ * `dismissStageFindings` requires `stage` membership. This function closes them
+ * directly with a recorded reason (FR-022).
+ */
+export async function triageNonFailureFindings(input: {
+  capability: Capability
+  class: DefectClass
+  words?: readonly string[]
+  reason: string
+}): Promise<Defect[]> {
+  if (input.reason.trim().length === 0) {
+    throw new StageError('alasan wajib diisi: penolakan tanpa alasan melanggar FR-022.')
+  }
+  const store = await loadDefectStore()
+  const matching = filterNonFailureDefects(store, input)
+  if (matching.length === 0) {
+    throw new StageError(
+      `tidak ada temuan terbuka dengan kelas ${input.class} untuk kapabilitas ${input.capability}.`,
+    )
+  }
+  const dismissedSet = new Set(matching.map((defect) => `${defect.capability} ${defect.word} ${defect.referenceOutput}`))
+  const updated = store.map((defect) => {
+    if (!dismissedSet.has(`${defect.capability} ${defect.word} ${defect.referenceOutput}`)) {
+      return defect
+    }
+    return {
+      ...defect,
+      status: 'dismissed' as const,
+      withdrawnReason: input.reason,
+      triageNote: `Ditutup lewat triase non-kegagalan: ${input.reason}`,
+    }
+  })
+  await writeDefectStore(updated)
+  return matching
 }
 
 /**
