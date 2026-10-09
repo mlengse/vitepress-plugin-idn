@@ -653,13 +653,13 @@ export async function triageNonFailureFindings(input: {
   reason: string
 }): Promise<Defect[]> {
   if (input.reason.trim().length === 0) {
-    throw new StageError('alasan wajib diisi: penolakan tanpa alasan melanggar FR-022.')
+    throw new StageError('alasan wajib diisi: penolakan tanpa alasan melanggar FR-022')
   }
   const store = await loadDefectStore()
   const matching = filterNonFailureDefects(store, input)
   if (matching.length === 0) {
     throw new StageError(
-      `tidak ada temuan terbuka dengan kelas ${input.class} untuk kapabilitas ${input.capability}.`,
+      `tidak ada temuan terbuka dengan kelas ${input.class} untuk kapabilitas ${input.capability}`,
     )
   }
   const dismissedSet = new Set(matching.map((defect) => `${defect.capability} ${defect.word} ${defect.referenceOutput}`))

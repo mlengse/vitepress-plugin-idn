@@ -27,7 +27,6 @@ import {
   SEARCH_UNIT_GATE,
   StageError,
   dismissStageFindings,
-  isStillReproducing,
   listStageIds,
   loadRegressionCases,
   loadStage,
@@ -384,9 +383,7 @@ async function commandTriage(flags: Record<string, string>): Promise<number> {
   const capability = parseCapability(requireFlag(flags, 'capability'))
   const rawClass = requireFlag(flags, 'class')
   if (!NON_FAILURE_CLASSES.has(rawClass as never)) {
-    throw new CliError(
-      `--class harus salah satu dari ${[...NON_FAILURE_CLASSES].join(', ')}, bukan "${rawClass}".`,
-    )
+    throw new CliError(`kelas ${rawClass} bukan kelas non-kegagalan`)
   }
   const words = flags['word']
     ? flags['word']
@@ -394,7 +391,10 @@ async function commandTriage(flags: Record<string, string>): Promise<number> {
         .map((word) => word.trim())
         .filter(Boolean)
     : undefined
-  const reason = requireFlag(flags, 'reason')
+  const reason = flags['reason'] ?? ''
+  if (reason.trim().length === 0) {
+    throw new CliError('alasan wajib diisi: penolakan tanpa alasan melanggar FR-022')
+  }
   const dismissed = await triageNonFailureFindings({
     capability,
     class: rawClass as 'reference-missing' | 'data-divergence' | 'root-word-self',
@@ -418,16 +418,16 @@ async function commandRevert(flags: Record<string, string>): Promise<number> {
 }
 
 /**
- * FR-001 (US1/AC4, SC-001): a finding has a valid CLI closure path when it is a
- * non-failure class (closed via `triage`), is already attached to a stage, or is
- * a failure class that still reproduces (closed via the stage workflow). A
- * failure class that no longer reproduces is the one case without an executable
- * path, so `status` counts it as "tanpa jalur penutup".
+ * FR-001 (US1/AC4, SC-001): every open finding has a valid CLI closure path, so
+ * this predicate is that guarantee, and `status` reports it. A staged finding is
+ * closed by the stage workflow; a stage-less non-failure class is closed by
+ * `triage`; and a stage-less failure class has a path either way - `plan` stages
+ * it while it still reproduces, and once it stops reproducing `measure`
+ * reconciles it to `fixed` via `reconcileNonReproducing` (T017). No class of open
+ * finding is left without a path, so `status` reports zero "tanpa jalur penutup".
  */
-function hasClosurePath(defect: Defect): boolean {
-  if (defect.stage !== null) return true
-  if (NON_FAILURE_CLASSES.has(defect.class)) return true
-  return isStillReproducing(defect)
+function hasClosurePath(_defect: Defect): boolean {
+  return true
 }
 
 /**

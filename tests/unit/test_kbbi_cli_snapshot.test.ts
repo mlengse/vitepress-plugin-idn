@@ -15,7 +15,6 @@ const mocks = vi.hoisted(() => ({
   captureSnapshot: vi.fn(),
   loadSnapshot: vi.fn(),
   loadDefectStore: vi.fn(),
-  isStillReproducing: vi.fn(),
 }))
 
 vi.mock('../../tools/kbbi/snapshot.ts', () => ({
@@ -28,11 +27,6 @@ vi.mock('../../tools/kbbi/snapshot.ts', () => ({
 vi.mock('../../tools/kbbi/compare.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../tools/kbbi/compare.ts')>()
   return { ...actual, loadDefectStore: mocks.loadDefectStore }
-})
-
-vi.mock('../../tools/kbbi/stages.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../tools/kbbi/stages.ts')>()
-  return { ...actual, isStillReproducing: mocks.isStillReproducing }
 })
 
 import { runCli } from '../../tools/kbbi/cli.ts'
@@ -57,10 +51,8 @@ beforeEach(() => {
   mocks.captureSnapshot.mockReset()
   mocks.loadSnapshot.mockReset()
   mocks.loadDefectStore.mockReset()
-  mocks.isStillReproducing.mockReset()
   mocks.captureSnapshot.mockResolvedValue(FAKE_SNAPSHOT)
   mocks.loadDefectStore.mockResolvedValue([])
-  mocks.isStillReproducing.mockReturnValue(false)
   // commandSnapshot logs progress; keep the test output readable.
   vi.spyOn(process.stdout, 'write').mockReturnValue(true)
 })
@@ -109,6 +101,53 @@ describe('triage command is advertised (T005, US1, FR-001)', () => {
   })
 })
 
+describe('triage rejection messages match the contract (T018, Prinsip I)', () => {
+  const captureErrors = (): string[] => {
+    const errors: string[] = []
+    vi.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+      errors.push(String(chunk))
+      return true
+    })
+    return errors
+  }
+
+  it('names a non-failure-class violation with the contract wording', async () => {
+    const errors = captureErrors()
+
+    expect(
+      await runCli([
+        'triage',
+        '--capability',
+        'stem',
+        '--class',
+        'candidate-bug',
+        '--reason',
+        'x',
+      ]),
+    ).toBe(1)
+    expect(errors.join('')).toContain('kelas candidate-bug bukan kelas non-kegagalan')
+  })
+
+  it('reports a blank reason with the contract wording', async () => {
+    const errors = captureErrors()
+
+    expect(
+      await runCli([
+        'triage',
+        '--capability',
+        'stem',
+        '--class',
+        'reference-missing',
+        '--reason',
+        '',
+      ]),
+    ).toBe(1)
+    expect(errors.join('')).toContain(
+      'alasan wajib diisi: penolakan tanpa alasan melanggar FR-022',
+    )
+  })
+})
+
 describe('status reports closure-path coverage (T015, US1/AC4, SC-001, FR-001)', () => {
   const capture = (): string[] => {
     const writes: string[] = []
@@ -119,35 +158,31 @@ describe('status reports closure-path coverage (T015, US1/AC4, SC-001, FR-001)',
     return writes
   }
 
-  it('splits open findings into those with a closure path and those without', async () => {
+  it('counts every open finding as having a closure path after T017', async () => {
     mocks.loadDefectStore.mockResolvedValue([
       // Non-failure class, no stage -> path via `triage`.
       { word: 'kata1', capability: 'syllable', class: 'reference-missing', status: 'open', stage: null },
-      // Failure class that still reproduces -> path via the stage workflow.
+      // Failure class, no stage -> path via `plan` while it still reproduces.
       { word: 'kata2', capability: 'stem', class: 'candidate-bug', status: 'open', stage: null },
-      // Failure class that no longer reproduces -> the one case with no path.
+      // Failure class, no stage, no longer reproduces -> closed by `measure` (T017).
       { word: 'kata3', capability: 'stem', class: 'candidate-bug', status: 'open', stage: null },
       // Already closed -> never counted as open.
       { word: 'kata4', capability: 'stem', class: 'candidate-bug', status: 'dismissed', stage: null },
     ])
-    mocks.isStillReproducing.mockImplementation(
-      (defect: { word: string }) => defect.word !== 'kata3',
-    )
 
     const writes = capture()
     expect(await runCli(['status'])).toBe(0)
 
     const output = writes.join('')
     expect(output).toContain('3 terbuka')
-    expect(output).toContain('2 punya jalur penutup')
-    expect(output).toContain('1 tanpa jalur penutup')
+    expect(output).toContain('3 punya jalur penutup')
+    expect(output).toContain('0 tanpa jalur penutup')
   })
 
   it('reports zero without-path findings when every open finding is closable', async () => {
     mocks.loadDefectStore.mockResolvedValue([
       { word: 'kata1', capability: 'syllable', class: 'reference-missing', status: 'open', stage: null },
     ])
-    mocks.isStillReproducing.mockReturnValue(true)
 
     const writes = capture()
     expect(await runCli(['status'])).toBe(0)
