@@ -110,17 +110,29 @@ function corePlugin(options: ResolvedIdnOptions): Plugin {
     name: 'vitepress-plugin-idn',
     enforce: 'pre',
 
-config() {
-      if (options.ui !== 'nav') return null
+    config() {
+      // Site options for the compiled `/vue` entry (T036): dist/client/Search.js
+      // reads `__IDN_OPTIONS__` instead of the virtual module so the entry also
+      // loads outside a Vite pipeline (see scripts/build-vue-entry.mjs). The
+      // value is the same resolvedOptions payload the virtual module serves to
+      // the aliased Search.vue, so both UI paths see one source of truth.
+      const define = {
+        __IDN_OPTIONS__: JSON.stringify({
+          language: options.language,
+          translations: options.translations,
+        }),
+      }
+      if (options.ui !== 'nav') return { define }
       aliasTarget = resolveSearchVue()
       if (!aliasTarget) {
         warn(
           'Could not locate src/client/Search.vue - the nav search UI was not wired. ' +
             "Set ui: 'external' and mount <IdnSearch /> manually.",
         )
-        return null
+        return { define }
       }
       return {
+        define,
         resolve: {
           alias: [{ find: THEME_SEARCH_FIND, replacement: aliasTarget }],
         },

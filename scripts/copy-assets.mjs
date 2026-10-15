@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -14,13 +14,21 @@ cpSync(
   join(root, 'dist', 'client', 'hyphenationRuntime.ts'),
 )
 cpSync(join(root, 'src', 'vue.d.ts'), join(root, 'dist', 'vue.d.ts'))
-writeFileSync(
-  join(root, 'dist', 'vue.js'),
-  [
-    '// `vitepress-plugin-idn/vue` entry: re-export the shipped SFC (T036).',
-    "export { default as IdnSearch } from './client/Search.vue'\n",
-  ].join('\n'),
-)
+
+// SC-010-style guard for the /vue entry (T036): the entry must be plain ESM.
+// It used to be a hand-written re-export of the raw SFC, which Node's ESM
+// loader (ERR_UNKNOWN_FILE_EXTENSION) and any bundler without a Vue loader
+// cannot resolve - only a Vite pipeline with a Vue plugin could. A packaging
+// regression must fail the build loudly instead of silently emitting that
+// again; the compiled entry comes from scripts/build-vue-entry.mjs.
+const VUE_ENTRY = 'vue.js'
+const vueEntry = join(root, 'dist', VUE_ENTRY)
+if (/(?:import|export)\b[^;'"]*['"][^'"]*\.vue['"]/.test(readFileSync(vueEntry, 'utf8'))) {
+  throw new Error(
+    `${VUE_ENTRY} still imports a '.vue' path - the /vue entry must be the ` +
+      'precompiled plain ESM emitted by scripts/build-vue-entry.mjs.',
+  )
+}
 
 // `hyphenasi` (github.com/mlengse/hyphenasi, FR-023) ships an `exports` map
 // with `"./*": "./*/index.js"`, so `hyphenasi/id` and `hyphenasi/en` resolve
@@ -40,4 +48,4 @@ for (const file of ['index.js', 'node/index.js']) {
   }
 }
 
-console.log('generated dist/vue.js; verified hyphenasi subpath imports; copied dist/client/* + dist/vue.d.ts')
+console.log('copied dist/client/* + dist/vue.d.ts; verified the /vue entry is plain ESM and hyphenasi subpath imports')

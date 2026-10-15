@@ -8,9 +8,11 @@
  * dist/ output of `npm run build` (which must be run first).
  *
  * Passing means the published layout (`dist/node/index.js`, `dist/vue.js`,
- * `dist/client/Search.vue`, `dist/core/search.js`) is consumable by a real
- * VitePress site with `ui: 'external'`, and the plugin's virtual options
- * module is still served to the externally-mounted component.
+ * `dist/client/Search.js`, `dist/core/search.js`) is consumable by a real
+ * VitePress site with `ui: 'external'`, that the precompiled entry still
+ * server-renders from the package (no SFC compile on the consumer side), and
+ * that the plugin's options/virtual modules still reach the externally
+ * mounted component.
  *
  * Exit code 0 = verified. Run: npm run verify:external
  */
@@ -35,6 +37,11 @@ if (!existsSync(join(root, 'dist', 'index.js')) || !existsSync(join(root, 'dist'
 
 const vitepressPackageName = 'vitepress-plugin-idn'
 
+// A distinctive base: the packaged entry derives its links from
+// `import.meta.env.BASE`, which Vite must replace inside node_modules modules
+// too. If it does not, this exact string never reaches the emitted assets.
+const PROBE_BASE = '/idn-base-probe/'
+
 const EXTERNAL_CONFIG = `import { defineConfig } from 'vitepress'
 import { idnPlugin } from 'vitepress-plugin-idn/node'
 
@@ -42,21 +49,32 @@ export default defineConfig({
   title: 'IdnTest',
   description: 'Fixture site for vitepress-plugin-idn',
   lang: 'id',
+  base: '${PROBE_BASE}',
   cleanUrls: true,
   vite: {
     // No alias to src/: resolves vitepress-plugin-idn via package exports.
-    plugins: [idnPlugin({ ui: 'external' })],
+    // A distinctive placeholder proves the plugin's options reach the
+    // precompiled entry (its __IDN_OPTIONS__ define), not the in-code
+    // fallback - both render the same UI otherwise.
+    plugins: [idnPlugin({ ui: 'external', translations: { placeholder: 'PROBE-UI' } })],
   },
 })
 `
 
+// Mounts <IdnSearch /> from the packaged entry into the layout, so the build
+// proves the precompiled component (a) server-renders without the plugin's
+// own Vue pipeline compiling it and (b) still receives the site's base.
 const EXTERNAL_THEME = `import DefaultTheme from 'vitepress/theme'
+import { h } from 'vue'
 import { IdnSearch } from 'vitepress-plugin-idn/vue'
 
 export default {
-  ...DefaultTheme,
-  enhanceApp({ app }) {
-    app.component('IdnSearch', IdnSearch)
+  extends: DefaultTheme,
+  Layout: {
+    render: () => h('div', { id: 'external-layout' }, [
+      h(DefaultTheme.Layout),
+      h(IdnSearch),
+    ]),
   },
 }
 `
@@ -91,6 +109,43 @@ try {
     console.error('[verify:external] no compiled Search.vue (idn-trigger) found among dist assets')
   } else {
     console.log(`[verify:external] IdnSearch compiled from real package entry into ${hits.length} asset(s)`)
+  }
+
+  // The fixture mounts <IdnSearch />, so the dialog must be server-rendered:
+  // this is the only place the precompiled entry is exercised through a real
+  // SSR pass rather than a client-only import.
+  const html = readFileSync(join(distOut, 'index.html'), 'utf8')
+  if (!html.includes('idn-trigger')) {
+    failed = true
+    console.error(
+      '[verify:external] <IdnSearch /> was not server-rendered (idn-trigger missing from index.html)',
+    )
+  }
+  if (!html.includes('PROBE-UI')) {
+    failed = true
+    console.error(
+      '[verify:external] the plugin translations did not reach the precompiled entry ' +
+        '(PROBE-UI missing from index.html) - __IDN_OPTIONS__ is not defined',
+    )
+  }
+
+  // The packaged entry derives link hrefs from import.meta.env.BASE; if Vite
+  // does not replace it inside node_modules, links silently lose the site base.
+  const baseHits = chunks.filter((file) => {
+    try {
+      return readFileSync(file, 'utf8').includes('idn-base-probe')
+    } catch {
+      return false
+    }
+  })
+  if (baseHits.length === 0) {
+    failed = true
+    console.error(
+      '[verify:external] site base was not inlined into the packaged /vue entry - ' +
+        'import.meta.env.BASE is not replaced inside node_modules modules',
+    )
+  } else {
+    console.log('[verify:external] site base inlined into the packaged /vue entry')
   }
   console.log('[verify:external] ui:external + package self-reference build OK (T036)')
 } catch (err) {

@@ -30,7 +30,7 @@ describe('T025: author utilities from the public entry', () => {
   it('renders the IDN_VERSION in a data attribute (diagnostics)', () => {
     const index = readDist('index.html')
     expect(index).toContain(`data-idn-version="${pkg.version}"`)
-    expect(index).toContain('IDN_VERSION: 0.1.0')
+    expect(index).toContain(`IDN_VERSION: ${pkg.version}`)
   })
 
   it('renders live stem() output in SSR HTML', () => {

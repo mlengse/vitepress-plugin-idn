@@ -18,4 +18,4 @@ export const RESOLVED_HYPHENATE_RUNTIME_ID = '\0' + HYPHENATE_RUNTIME_ID
 export const THEME_PROXY_ID = '\0vitepress-plugin-idn:theme-proxy'
 
 /** Package version surfaced in the UI (`data-idn-version` attribute) and diagnostics. */
-export const IDN_VERSION = '0.1.0'
+export const IDN_VERSION = '0.1.2'
