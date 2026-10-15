@@ -30,6 +30,32 @@ if (/(?:import|export)\b[^;'"]*['"][^'"]*\.vue['"]/.test(readFileSync(vueEntry, 
   )
 }
 
+// The /vue entry's `<style scoped>` ships separately as dist/client/Search.css:
+// compileScript handles the script (and inline template) only, so the CSS is
+// compiled by scripts/build-vue-entry.mjs into that file. Guard the pair - the
+// scope id baked into the CSS must equal the component's `__scopeId`, or the
+// stylesheet matches nothing and ui: 'external' renders unstyled, which is the
+// defect this pair exists to prevent.
+const STYLE_PATH = 'client/Search.css'
+const COMPILED_PATH = 'client/Search.js'
+const css = readFileSync(join(root, 'dist', STYLE_PATH), 'utf8')
+const component = readFileSync(join(root, 'dist', COMPILED_PATH), 'utf8')
+const cssScope = /data-v-([0-9a-f]+)/.exec(css)?.[1]
+const moduleScope = /__scopeId\s*=\s*['"]data-v-([0-9a-f]+)['"]/.exec(component)?.[1]
+if (!cssScope || !css.includes('.idn-overlay')) {
+  throw new Error(
+    `dist/${STYLE_PATH} is missing expected rules or a scope id - the /vue ` +
+      'entry would ship unstyled.',
+  )
+}
+if (cssScope !== moduleScope) {
+  throw new Error(
+    `scope id mismatch: dist/${STYLE_PATH} scopes to data-v-${cssScope} but ` +
+      `dist/${COMPILED_PATH} sets __scopeId data-v-${moduleScope} - the shipped ` +
+      'CSS would match nothing.',
+  )
+}
+
 // `hyphenasi` (github.com/mlengse/hyphenasi, FR-023) ships an `exports` map
 // with `"./*": "./*/index.js"`, so `hyphenasi/id` and `hyphenasi/en` resolve
 // under plain Node ESM with no rewrite needed. The old `hyphen` (CJS, no
@@ -48,4 +74,7 @@ for (const file of ['index.js', 'node/index.js']) {
   }
 }
 
-console.log('copied dist/client/* + dist/vue.d.ts; verified the /vue entry is plain ESM and hyphenasi subpath imports')
+console.log(
+  'copied dist/client/* + dist/vue.d.ts; verified the /vue entry is plain ESM, ' +
+    'its scoped CSS pair (Search.css/Search.js) shares one scope id, and hyphenasi subpath imports',
+)

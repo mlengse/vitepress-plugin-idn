@@ -1,6 +1,6 @@
 {
   "name": "vitepress-plugin-idn",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Indonesian language capabilities for VitePress: morphology-aware search, stemming, syllabification and hyphenation",
   "type": "module",
   "license": "MIT",
@@ -13,6 +13,7 @@
       "types": "./dist/vue.d.ts",
       "default": "./dist/vue.js"
     },
+    "./vue.css": "./dist/client/Search.css",
     "./node": {
       "types": "./dist/node/index.d.ts",
       "default": "./dist/node/index.js"

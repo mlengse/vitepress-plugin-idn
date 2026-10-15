@@ -27,8 +27,20 @@
  * `dist/client/Search.vue` is still copied by `scripts/copy-assets.mjs`:
  * `resolveSearchVue()` (src/node/index.ts) aliases that exact file for the
  * `ui: 'nav'` default-theme UI, which keeps compiling the SFC itself.
+ *
+ * The SFC's `<style scoped>` block is compiled here too, into
+ * `dist/client/Search.css`, because `compileScript` handles only the script (and
+ * inline template) - CSS lives in `descriptor.styles` and is normally compiled
+ * by `compileStyle` and injected by `@vitejs/plugin-vue`, neither of which runs
+ * for a precompiled entry. Skipping it shipped a component with no styles at all
+ * on the `ui: 'external'` path, so this step is load-bearing, not cosmetic. The
+ * generated module must NOT `import` the CSS statically: Node's ESM loader
+ * cannot load `.css`, and `tests/contract/test_vue_entry.test.ts` requires the
+ * entry to import cleanly under plain Node. Consumers load it via the
+ * `vitepress-plugin-idn/vue.css` export instead.
  */
 
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
@@ -39,13 +51,34 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)))
 // Both are declared devDependencies (typescript) or peer/devDependencies
 // (vue); resolve them from the project root.
 const require = createRequire(join(root, 'package.json'))
-const { compileScript, parse } = require('vue/compiler-sfc')
+const { compileScript, compileStyle, parse } = require('vue/compiler-sfc')
 const ts = require('typescript')
 
 const SFC_PATH = join(root, 'src', 'client', 'Search.vue')
 const CLIENT_OUT_DIR = join(root, 'dist', 'client')
 const COMPILED_PATH = join(CLIENT_OUT_DIR, 'Search.js')
+const STYLE_PATH = join(CLIENT_OUT_DIR, 'Search.css')
 const ENTRY_PATH = join(root, 'dist', 'vue.js')
+
+/**
+ * Scope id for the SFC's `<style scoped>` block. `compileScript` does not emit
+ * one (`@vitejs/plugin-vue` attaches it at SFC-compile time), so this build
+ * attaches `__scopeId` from this same value and `compileStyle` bakes
+ * `[data-v-<SCOPE_ID>]` into the CSS - one constant keeps the two in lockstep.
+ * Derived from a fixed string rather than the absolute path so the id is
+ * byte-stable across machines and rebuilds.
+ */
+const SCOPE_ID = createHash('sha256')
+  .update('vitepress-plugin-idn/client/Search.vue')
+  .digest('hex')
+  .slice(0, 8)
+
+/**
+ * Local name `compileScript` gives the component via `genDefaultAs`, so this
+ * build can attach `__scopeId` and export it itself (compileScript then emits no
+ * `export default`).
+ */
+const SFC_IDENTIFIER = '_sfc_main'
 
 /**
  * Default options for the fallback, taken from the same module the plugin
@@ -81,10 +114,13 @@ async function buildVueEntry() {
   // inlineTemplate compiles <template> against the script bindings, so the
   // emitted module carries its own render function; mode: 'module' keeps the
   // runtime helpers as ESM imports from the external `vue` (peer dep).
+  // genDefaultAs names the component instead of exporting it, so __scopeId can
+  // be attached below before the single default export is emitted.
   const { content } = compileScript(descriptor, {
-    id: SFC_PATH,
+    id: SCOPE_ID,
     isProd: true,
     inlineTemplate: true,
+    genDefaultAs: SFC_IDENTIFIER,
     templateOptions: { compilerOptions: { mode: 'module' } },
   })
 
@@ -113,6 +149,15 @@ async function buildVueEntry() {
           'loadable outside a Vite build.',
       )
     }
+  }
+
+  // Guard the genDefaultAs contract: if compileScript stops emitting the named
+  // component the appended __scopeId/export below would reference nothing.
+  if (!new RegExp(`const ${SFC_IDENTIFIER}\\s*=`).test(outputText)) {
+    throw new Error(
+      `compileScript did not emit 'const ${SFC_IDENTIFIER} =' - update genDefaultAs in ` +
+        'scripts/build-vue-entry.mjs (the build appends __scopeId and the default export).',
+    )
   }
 
   const coreSearchEntry = join(root, 'dist', 'core', 'search.js')
@@ -163,6 +208,55 @@ async function buildVueEntry() {
       '// no SFC transform required from consumers. Do not edit.',
       '',
       compiled,
+      '',
+      '// Scope id for the <style scoped> block shipped as ./Search.css. Both the',
+      '// attribute here and the `[data-v-...]` in that file come from SCOPE_ID in',
+      '// scripts/build-vue-entry.mjs; if they drift the CSS matches nothing.',
+      `${SFC_IDENTIFIER}.__scopeId = ${JSON.stringify(`data-v-${SCOPE_ID}`)}`,
+      `export default ${SFC_IDENTIFIER}`,
+      '',
+    ].join('\n'),
+    'utf8',
+  )
+
+  // <style scoped> -> dist/client/Search.css (see the file header for why this
+  // is required, and why the compiled module must not import it).
+  if (descriptor.styles.length === 0) {
+    throw new Error(
+      'src/client/Search.vue has no <style> block - the /vue entry would ship ' +
+        'unstyled. Restore the styles or remove the CSS emission and its assertions.',
+    )
+  }
+  const css = descriptor.styles
+    .map((style) => {
+      const result = compileStyle({
+        source: style.content,
+        filename: SFC_PATH,
+        id: SCOPE_ID,
+        scoped: style.scoped,
+      })
+      if (result.errors.length > 0) {
+        throw new Error(
+          `Search.vue <style> failed to compile: ${result.errors.map(String).join('\n')}`,
+        )
+      }
+      return result.code
+    })
+    .join('\n')
+  if (!css.includes('.idn-overlay') || !css.includes(`data-v-${SCOPE_ID}`)) {
+    throw new Error(
+      'dist/client/Search.css is missing expected rules (.idn-overlay / scope id) - ' +
+        'the /vue entry would ship unstyled.',
+    )
+  }
+  writeFileSync(
+    STYLE_PATH,
+    [
+      '/* GENERATED by scripts/build-vue-entry.mjs from src/client/Search.vue. */',
+      `/* Scoped to data-v-${SCOPE_ID}; import via 'vitepress-plugin-idn/vue.css'. */`,
+      '',
+      css,
+      '',
     ].join('\n'),
     'utf8',
   )
@@ -179,7 +273,9 @@ async function buildVueEntry() {
     'utf8',
   )
 
-  console.log('generated dist/vue.js + dist/client/Search.js from src/client/Search.vue')
+  console.log(
+    'generated dist/vue.js + dist/client/Search.js + dist/client/Search.css from src/client/Search.vue',
+  )
 }
 
 await buildVueEntry()

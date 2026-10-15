@@ -67,6 +67,10 @@ export default defineConfig({
 const EXTERNAL_THEME = `import DefaultTheme from 'vitepress/theme'
 import { h } from 'vue'
 import { IdnSearch } from 'vitepress-plugin-idn/vue'
+// The precompiled /vue entry carries no CSS of its own (compileScript drops the
+// SFC's <style scoped>), so the documented stylesheet import is what styles the
+// external UI. Without it the dialog renders unstyled.
+import 'vitepress-plugin-idn/vue.css'
 
 export default {
   extends: DefaultTheme,
@@ -126,6 +130,32 @@ try {
     console.error(
       '[verify:external] the plugin translations did not reach the precompiled entry ' +
         '(PROBE-UI missing from index.html) - __IDN_OPTIONS__ is not defined',
+    )
+  }
+
+  // ui: 'external' styles depend on the packaged stylesheet: the precompiled
+  // entry ships no CSS, so `import 'vitepress-plugin-idn/vue.css'` must resolve
+  // via exports and its rules must reach a built stylesheet. Without this the
+  // dialog renders unstyled - no overlay, no modal - which is the whole defect.
+  const cssFiles = readdirSync(join(distOut, 'assets'), { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith('.css'))
+    .map((e) => join(e.parentPath, e.name))
+  const styledCss = cssFiles.filter((file) => {
+    try {
+      return readFileSync(file, 'utf8').includes('.idn-overlay')
+    } catch {
+      return false
+    }
+  })
+  if (styledCss.length === 0) {
+    failed = true
+    console.error(
+      '[verify:external] no built stylesheet contains the IdnSearch rules ' +
+        '(.idn-overlay) - the vue.css import did not reach the bundle',
+    )
+  } else {
+    console.log(
+      `[verify:external] ui: 'external' stylesheet emitted with IdnSearch rules (${styledCss.length} file(s))`,
     )
   }
 

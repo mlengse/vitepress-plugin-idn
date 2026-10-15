@@ -83,6 +83,7 @@ export default defineConfig({
 <!-- any theme component -->
 <script setup lang="ts">
 import { IdnSearch } from 'vitepress-plugin-idn/vue'
+import 'vitepress-plugin-idn/vue.css'
 </script>
 
 <template>
@@ -92,6 +93,11 @@ import { IdnSearch } from 'vitepress-plugin-idn/vue'
 
 With `ui: 'external'` the plugin does not replace the theme's search button;
 it only serves the index, options and the `IdnSearch` component.
+
+The `vitepress-plugin-idn/vue.css` import is required: the precompiled `/vue`
+entry carries no styling of its own, so the dialog renders unstyled without it.
+(The default `ui: 'nav'` path compiles the SFC through your Vue pipeline and
+does not need this import.)
 
 ## Author utilities (public API)
 
