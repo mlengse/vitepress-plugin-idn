@@ -272,4 +272,50 @@ describe('hyphenationRuntime', () => {
       ;(global as any).document = originalDocument
     }
   })
+
+  it('handles multiple matching containers, skipping pre-processed nodes and processing unprocessed nodes', () => {
+    const doc = new MockDocument()
+
+    // Processed container
+    const rootProcessed = new MockElement('div', null, 'vp-doc', { 'data-idn-hyphenated': 'true' })
+    rootProcessed.ownerDocument = doc
+    const p1 = new MockElement('p', rootProcessed)
+    rootProcessed.appendChild(p1)
+    const text1 = new MockTextNode('pemerintahan', p1)
+    p1.appendChild(text1)
+
+    // Unprocessed container
+    const rootUnprocessed = new MockElement('div', null, 'vp-doc')
+    rootUnprocessed.ownerDocument = doc
+    const p2 = new MockElement('p', rootUnprocessed)
+    rootUnprocessed.appendChild(p2)
+    const text2 = new MockTextNode('kebudayaan', p2)
+    p2.appendChild(text2)
+
+    ;(global as any).document = {
+      querySelectorAll(sel: string) {
+        if (sel === '.vp-doc') return [rootProcessed, rootUnprocessed]
+        return []
+      }
+    }
+
+    const options: HyphenationRuntimeOptions = {
+      language: 'id',
+      minWordLength: 4,
+      selector: '.vp-doc',
+    }
+
+    const processedCount = applyHyphenation(options)
+
+    // Only unprocessed container should be processed
+    expect(processedCount).toBe(1)
+
+    // Processed container text remains unchanged
+    expect(text1.nodeValue).toBe('pemerintahan')
+    expect(rootProcessed.getAttribute('data-idn-hyphenated')).toBe('true')
+
+    // Unprocessed container text is hyphenated and container is marked as processed
+    expect(text2.nodeValue).toContain(SOFT_HYPHEN)
+    expect(rootUnprocessed.getAttribute('data-idn-hyphenated')).toBe('true')
+  })
 })
