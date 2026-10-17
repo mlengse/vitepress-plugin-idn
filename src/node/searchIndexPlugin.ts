@@ -150,18 +150,20 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
     }
   }
 
+  async function initAndScan(): Promise<void> {
+    const userConfig = config ? getVitePressContext(config)?.userConfig ?? {} : {}
+    md = await createIdnMarkdownRenderer(
+      srcDir,
+      userConfig.markdown as MarkdownOptions | undefined,
+      base,
+    )
+    await fullScan()
+    rebuildEnvelope()
+  }
+
   function ensureScanned(): Promise<void> {
     if (!scanPromise) {
-      scanPromise = (async () => {
-        const userConfig = config ? getVitePressContext(config)?.userConfig ?? {} : {}
-        md = await createIdnMarkdownRenderer(
-          srcDir,
-          userConfig.markdown as MarkdownOptions | undefined,
-          base,
-        )
-        await fullScan()
-        rebuildEnvelope()
-      })()
+      scanPromise = initAndScan()
     }
     return scanPromise
   }
