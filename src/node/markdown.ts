@@ -61,6 +61,7 @@ function findRegion(lines: string[], regionName: string): { start: number; end: 
   let regexp: RegExp | null = null
   let start = -1
   for (const [lineId, line] of lines.entries()) {
+    if (!line.includes(regionName)) continue
     if (regexp === null) {
       for (const reg of REGION_REGEXPS) {
         if (testLine(line, reg, regionName)) {
