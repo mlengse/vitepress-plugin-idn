@@ -25,6 +25,17 @@ const ID_CORRECTIONS: Readonly<Record<string, string>> = {
 }
 
 const idStemmer = new Stemmer()
+const idEngineCache = new Map<string, string>()
+
+/** Memoized wrapper for idStemmer.stem to avoid redundant engine calls across stem and isRootLike */
+function stemIdEngine(word: string): string {
+  const hit = idEngineCache.get(word)
+  if (hit !== undefined) return hit
+  const result = idStemmer.stem(word) || word
+  if (idEngineCache.size >= MAX_CACHE) idEngineCache.clear()
+  idEngineCache.set(word, result)
+  return result
+}
 
 /**
  * Prefixes the engine is expected to remove on its own. Used only by
@@ -77,7 +88,7 @@ const STRIP_RESIDUAL_AFFIX = true
 function isRootLike(truncated: string): boolean {
   if (truncated.length < 3) return false
   if (DERIVATIONAL_PREFIXES.some((prefix) => truncated.startsWith(prefix))) return false
-  return idStemmer.stem(truncated) === truncated
+  return stemIdEngine(truncated) === truncated
 }
 
 /**
@@ -169,7 +180,7 @@ export function stem(word: string, language: IdnLanguage = 'id'): string {
       if (corrected) {
         result = corrected
       } else {
-        const engineResult = idStemmer.stem(lower) || lower
+        const engineResult = stemIdEngine(lower)
         result = engineResult === lower ? (stripResidualAffix(lower) ?? engineResult) : engineResult
       }
     } else {
