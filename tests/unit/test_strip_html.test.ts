@@ -46,4 +46,25 @@ describe('stripHtml', () => {
       '<p>Ini &nbsp; adalah &lt;contoh&gt; &quot;teks&quot; &#39;test&#39;.</p>'
     expect(stripHtml(input)).toBe('Pengenalan & Panduan Ini adalah <contoh> "teks" \'test\'.')
   })
+
+  it('handles self-closing tags and tags with complex attributes', () => {
+    expect(stripHtml('Text <img src="image.png" alt="description" /> with image')).toBe('Text with image')
+    expect(stripHtml('<div data-test="true" class="container">Section Content</div>')).toBe('Section Content')
+  })
+
+  it('handles header anchors with attribute order variations', () => {
+    expect(stripHtml('<h2>Title <a href="#title" class="header-anchor">#</a></h2>')).toBe('Title')
+  })
+
+  it('handles HTML comments', () => {
+    expect(stripHtml('Before <!-- comment text --> After')).toBe('Before After')
+  })
+
+  it('handles multiline HTML tags with line breaks within tag definitions', () => {
+    expect(stripHtml('<div\n  class="multiline"\n  id="main"\n>Content</div>')).toBe('Content')
+  })
+
+  it('preserves unhandled or unknown HTML entities as-is', () => {
+    expect(stripHtml('Copyright &copy; 2025 &unknown;')).toBe('Copyright &copy; 2025 &unknown;')
+  })
 })
