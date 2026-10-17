@@ -27,19 +27,19 @@ const SKIP_DIRS = new Set(['node_modules', '.git', '.vitepress'])
 const FM_TITLE_RE = /^\s*title:\s*(.+)$/m
 const FM_SEARCH_RE = /^\s*search:\s*(false|no|off)\b/i
 const HEADING_RE = /<h([1-6])\s+id="([^"]*)"[^>]*>([\s\S]*?)<\/h\1>/gi
-const HTML_TAG_RE = /<[^>]+>/g
-const BLOCK_TAGS_RE = /<\/?(script|style|template)[^>]*>/gi
-const HEADER_ANCHOR_RE = /<a\b[^>]*class="[^"]*header-anchor[^"]*"[^>]*>[\s\S]*?<\/a>/gi
+const COMBINED_HTML_RE =
+  /<a\b[^>]*class="[^"]*header-anchor[^"]*"[^>]*>[\s\S]*?<\/a>|<[^>]+>|&(?:ZeroWidthSpace|nbsp|lt|gt|quot|#39|#x27|amp);/gi
 
-const ENTITIES: Array<[RegExp, string]> = [
-  [/&ZeroWidthSpace;/g, ''],
-  [/&nbsp;/g, ' '],
-  [/&lt;/g, '<'],
-  [/&gt;/g, '>'],
-  [/&quot;/g, '"'],
-  [/&#39;|&#x27;/g, "'"],
-  [/&amp;/g, '&'],
-]
+const ENTITY_MAP: Record<string, string> = {
+  '&ZeroWidthSpace;': '',
+  '&nbsp;': ' ',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  "&#39;": "'",
+  "&#x27;": "'",
+  '&amp;': '&',
+}
 
 export interface PageScan {
   /** Site-absolute path (`/`, `/guide/start`) derived from srcDir-relative location. */
@@ -106,10 +106,16 @@ function parseFrontmatter(raw: string): Frontmatter {
 
 /** HTML -> plain text for index records (decodes common entities). */
 export function stripHtml(html: string): string {
-  let text = html.replace(BLOCK_TAGS_RE, ' ').replace(HEADER_ANCHOR_RE, ' ')
-  text = text.replace(HTML_TAG_RE, ' ')
-  for (const [pattern, replacement] of ENTITIES) text = text.replace(pattern, replacement)
-  return text.replace(/\s+/g, ' ').trim()
+  if (!html.includes('<') && !html.includes('&')) {
+    return html.replace(/\s+/g, ' ').trim()
+  }
+  return html
+    .replace(
+      COMBINED_HTML_RE,
+      (match) => (match[0] === '<' ? ' ' : ENTITY_MAP[match] ?? match),
+    )
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 interface Heading {
