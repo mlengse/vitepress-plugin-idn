@@ -45,32 +45,55 @@ const SKIP_SELECTOR = [
 
 const PROCESSED_ATTR = 'data-idn-hyphenated'
 
-function canProcess(node: Node): boolean {
-  const parent = node.parentElement
-  if (!parent) return false
-  if (parent.closest(SKIP_SELECTOR)) return false
-  return /\p{L}{2,}/u.test(node.nodeValue ?? '')
-}
-
 function hyphenateContainer(root: Element, options: HyphenationRuntimeOptions): boolean {
   const doc = root.ownerDocument
-  const walker = doc.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */)
+  const NodeFilterConst = typeof NodeFilter !== 'undefined' ? NodeFilter : {
+    SHOW_ELEMENT: 1,
+    SHOW_TEXT: 4,
+    FILTER_ACCEPT: 1,
+    FILTER_REJECT: 2,
+    FILTER_SKIP: 3,
+  }
+
+  const whatToShow = NodeFilterConst.SHOW_ELEMENT | NodeFilterConst.SHOW_TEXT
+
+  const filter = {
+    acceptNode(node: Node): number {
+      if (node.nodeType === 1 /* Node.ELEMENT_NODE */) {
+        if ((node as Element).matches(SKIP_SELECTOR)) {
+          return NodeFilterConst.FILTER_REJECT
+        }
+        return NodeFilterConst.FILTER_SKIP
+      }
+      if (node.nodeType === 3 /* Node.TEXT_NODE */) {
+        if (/\p{L}{2,}/u.test(node.nodeValue ?? '')) {
+          return NodeFilterConst.FILTER_ACCEPT
+        }
+      }
+      return NodeFilterConst.FILTER_SKIP
+    },
+  }
+
+  // Pass filter both as function/object for cross-environment compatibility
+  const walker = doc.createTreeWalker(
+    root,
+    whatToShow,
+    filter as unknown as NodeFilter
+  )
+
   let changed = false
   let node = walker.nextNode()
   while (node) {
-    const next = walker.nextNode()
-    if (canProcess(node)) {
-      const before = node.nodeValue ?? ''
-      const after = hyphenateText(before, {
-        language: options.language,
-        minWordLength: options.minWordLength,
-      })
-      if (after !== before) {
-        node.nodeValue = after
-        changed = true
-      }
+    const before = node.nodeValue ?? ''
+    const after = hyphenateText(before, {
+      language: options.language,
+      minWordLength: options.minWordLength,
+    })
+    if (after !== before) {
+      node.nodeValue = after
+      changed = true
     }
-    node = next
+    node = walker.nextNode()
   }
   return changed
 }
