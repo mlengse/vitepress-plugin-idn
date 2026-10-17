@@ -17,7 +17,7 @@
  * host-hook composition (algolia/ui warnings).
  */
 
-import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { extname, normalize } from 'node:path'
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
 import type { MarkdownOptions, MarkdownRenderer } from 'vitepress'
@@ -67,10 +67,10 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
     }
   }
 
-  function scanOne(abs: string): void {
+  async function scanOne(abs: string): Promise<void> {
     let raw: string
     try {
-      raw = readFileSync(abs, 'utf8')
+      raw = await readFile(abs, 'utf8')
     } catch {
       pages.delete(abs)
       clearDeps(abs)
@@ -97,13 +97,12 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
     }
   }
 
-  function fullScan(): void {
+  async function fullScan(): Promise<void> {
     pages.clear()
     depPages.clear()
     pageDeps.clear()
-    for (const abs of discoverPages(srcDir, options.include, options.exclude)) {
-      scanOne(abs)
-    }
+    const pagePaths = discoverPages(srcDir, options.include, options.exclude)
+    await Promise.all(pagePaths.map((abs) => scanOne(abs)))
   }
 
   function rebuildEnvelope(): void {
@@ -160,7 +159,7 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
           userConfig.markdown as MarkdownOptions | undefined,
           base,
         )
-        fullScan()
+        await fullScan()
         rebuildEnvelope()
       })()
     }
@@ -169,7 +168,7 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
 
   async function rescanPage(abs: string): Promise<void> {
     await ensureScanned()
-    scanOne(abs)
+    await scanOne(abs)
     rebuildEnvelope()
   }
 
@@ -224,9 +223,7 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
       if (pages.has(abs)) {
         await rescanPage(abs)
       } else if (depPages.has(abs)) {
-        for (const page of [...(depPages.get(abs) ?? [])]) {
-          scanOne(page)
-        }
+        await Promise.all([...(depPages.get(abs) ?? [])].map((page) => scanOne(page)))
         rebuildEnvelope()
       } else {
         // Not part of the index (excluded or unknown): let default HMR run.
@@ -239,7 +236,7 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
       const rescanStructure = async (file: string): Promise<void> => {
         if (extname(file) !== MD_EXT) return
         await ensureScanned()
-        fullScan()
+        await fullScan()
         rebuildEnvelope()
         await reloadVirtual(server)
       }
