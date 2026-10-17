@@ -192,20 +192,20 @@ function splitSections(
  * Render one source file into search sections. Returns `null` when the page
  * is excluded (frontmatter `search: false` or include/exclude globs).
  */
-export function scanPage(
+export async function scanPage(
   absPath: string,
   srcDir: string,
   raw: string,
   md: MarkdownRenderer,
   language: IdnLanguage,
-): PageScan {
+): Promise<PageScan> {
   const pagePath = pagePathOf(srcDir, absPath)
   const frontmatter = parseFrontmatter(raw)
   if (frontmatter.searchDisabled) return { pagePath, sections: [], deps: [] }
 
   const deps = new Set<string>()
   const source = stripFrontmatter(raw)
-  const expanded = expandIncludes(srcDir, source, absPath, deps)
+  const expanded = await expandIncludes(srcDir, source, absPath, deps)
   const html = md.render(expanded)
   const firstHeading = collectHeadings(html)[0]
   const pageTitle =

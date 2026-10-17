@@ -78,7 +78,7 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
     }
     clearDeps(abs)
     try {
-      const result = scanPage(abs, srcDir, raw, md as MarkdownRenderer, options.language)
+      const result = await scanPage(abs, srcDir, raw, md as MarkdownRenderer, options.language)
       if (result.sections.length > 0) pages.set(abs, result.sections)
       else pages.delete(abs)
       if (result.deps.length > 0) {
