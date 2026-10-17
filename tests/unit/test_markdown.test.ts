@@ -44,7 +44,7 @@ describe('stripFrontmatter', () => {
 })
 
 describe('expandIncludes', () => {
-  it('expands region includes correctly', () => {
+  it('expands region includes correctly', async () => {
     const tmpDir = join(tmpdir(), 'test_markdown_' + Date.now())
     mkdirSync(tmpDir, { recursive: true })
 
@@ -63,13 +63,13 @@ describe('expandIncludes', () => {
     const srcFile = join(tmpDir, 'index.md')
     const srcContent = '<!-- @include: ./snippet.js#snippet-1 -->'
 
-    const result = expandIncludes(tmpDir, srcContent, srcFile)
+    const result = await expandIncludes(tmpDir, srcContent, srcFile)
     expect(result).toBe('const b = 2;\nconst c = 3;')
 
     rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('handles non-existent region gracefully (slice(undefined, undefined) returns all lines)', () => {
+  it('handles non-existent region gracefully (slice(undefined, undefined) returns all lines)', async () => {
     const tmpDir = join(tmpdir(), 'test_markdown_' + Date.now())
     mkdirSync(tmpDir, { recursive: true })
 
@@ -86,7 +86,7 @@ describe('expandIncludes', () => {
     const srcFile = join(tmpDir, 'index.md')
     const srcContent = '<!-- @include: ./snippet.js#non-existent -->'
 
-    const result = expandIncludes(tmpDir, srcContent, srcFile)
+    const result = await expandIncludes(tmpDir, srcContent, srcFile)
     expect(result).toBe(fileContent)
 
     rmSync(tmpDir, { recursive: true, force: true })

@@ -23,7 +23,7 @@
  * - vitepress 1.6.4 `processIncludes` / `findRegion` / `testLine` (parity)
  */
 
-import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { dirname, extname, join } from 'node:path'
 import { createMarkdownRenderer } from 'vitepress'
 import type { MarkdownOptions, MarkdownRenderer } from 'vitepress'
@@ -83,57 +83,74 @@ function findRegion(lines: string[], regionName: string): { start: number; end: 
  * resolve file-relative includes); `deps` (optional) collects the resolved
  * path of every included file for watch/HMR invalidation (FR-006).
  */
-export function expandIncludes(
+export async function expandIncludes(
   srcDir: string,
   src: string,
   file: string,
   deps?: Set<string>,
-): string {
-  return src.replace(INCLUDE_RE, (match, meta: string) => {
-    if (!meta.length) return match
+): Promise<string> {
+  const matches = [...src.matchAll(INCLUDE_RE)]
+  if (matches.length === 0) return src
 
-    const range = meta.match(RANGE_META_RE)
-    const region = meta.match(REGION_META_RE)
-    const hasMeta = Boolean(region || range)
-    if (hasMeta) {
-      const len = (region?.[0].length || 0) + (range?.[0].length || 0)
-      meta = meta.slice(0, -len)
-    }
+  const replacements = await Promise.all(
+    matches.map(async (match) => {
+      let meta = match[1] ?? ''
+      if (!meta.length) return match[0]
 
-    try {
-      const includePath =
-        meta[0] === '@'
-          ? join(srcDir, meta.slice(meta[1] === '/' ? 2 : 1))
-          : join(dirname(file), meta)
-      let content = readFileSync(includePath, 'utf8')
-
-      if (region) {
-        const regionName = region[0].slice(1)
-        const lines = content.split(/\r?\n/)
-        const found = findRegion(lines, regionName)
-        content = lines.slice(found?.start, found?.end).join('\n')
-      }
-      if (range) {
-        const [, startLine, endLine] = range
-        const lines = content.split(/\r?\n/)
-        content = lines
-          .slice(
-            startLine ? parseInt(startLine, 10) - 1 : undefined,
-            endLine ? parseInt(endLine, 10) : undefined,
-          )
-          .join('\n')
-      }
-      if (!hasMeta && extname(includePath) === '.md') {
-        content = content.replace(FRONTMATTER_RE, '')
+      const range = meta.match(RANGE_META_RE)
+      const region = meta.match(REGION_META_RE)
+      const hasMeta = Boolean(region || range)
+      if (hasMeta) {
+        const len = (region?.[0].length || 0) + (range?.[0].length || 0)
+        meta = meta.slice(0, -len)
       }
 
-      deps?.add(includePath)
-      return expandIncludes(srcDir, content, includePath, deps)
-    } catch {
-      if (process.env.DEBUG) warn(`Include file not found: ${meta}`)
-      return match
-    }
-  })
+      try {
+        const includePath =
+          meta[0] === '@'
+            ? join(srcDir, meta.slice(meta[1] === '/' ? 2 : 1))
+            : join(dirname(file), meta)
+        let content = await readFile(includePath, 'utf8')
+
+        if (region) {
+          const regionName = region[0].slice(1)
+          const lines = content.split(/\r?\n/)
+          const found = findRegion(lines, regionName)
+          content = lines.slice(found?.start, found?.end).join('\n')
+        }
+        if (range) {
+          const [, startLine, endLine] = range
+          const lines = content.split(/\r?\n/)
+          content = lines
+            .slice(
+              startLine ? parseInt(startLine, 10) - 1 : undefined,
+              endLine ? parseInt(endLine, 10) : undefined,
+            )
+            .join('\n')
+        }
+        if (!hasMeta && extname(includePath) === '.md') {
+          content = content.replace(FRONTMATTER_RE, '')
+        }
+
+        deps?.add(includePath)
+        return await expandIncludes(srcDir, content, includePath, deps)
+      } catch {
+        if (process.env.DEBUG) warn(`Include file not found: ${meta}`)
+        return match[0]
+      }
+    }),
+  )
+
+  let result = ''
+  let lastIndex = 0
+  for (let i = 0; i < matches.length; i++) {
+    const match = matches[i]!
+    const index = match.index!
+    result += src.slice(lastIndex, index) + replacements[i]
+    lastIndex = index + match[0].length
+  }
+  result += src.slice(lastIndex)
+  return result
 }
 
 /**
