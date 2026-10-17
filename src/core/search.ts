@@ -80,6 +80,18 @@ function escapeRegex(term: string): string {
  * so replacing them can never corrupt a `<mark>` tag or an HTML entity;
  * they are restored as entities at the end.
  */
+const AMP = '\u0001'
+const LT = '\u0002'
+const GT = '\u0003'
+
+const RESTORE_MAP: Record<string, string> = {
+  [AMP]: '&amp;',
+  [LT]: '&lt;',
+  [GT]: '&gt;',
+}
+// eslint-disable-next-line no-control-regex
+const RESTORE_PATTERN = /[\u0001\u0002\u0003]/g
+
 function makeSnippet(text: string, terms: string[]): string {
   const flat = text.replace(/\s+/g, ' ').trim()
   if (flat.length === 0) return ''
@@ -97,9 +109,6 @@ function makeSnippet(text: string, terms: string[]): string {
   const leading = start > 0 ? '\u2026' : ''
   const trailing = end < flat.length ? '\u2026' : ''
 
-  const AMP = '\u0001'
-  const LT = '\u0002'
-  const GT = '\u0003'
   let window = flat
     .slice(start, end)
     .replace(/&/g, AMP)
@@ -111,10 +120,7 @@ function makeSnippet(text: string, terms: string[]): string {
     window = window.replace(pattern, (match) => `<mark>${match}</mark>`)
   }
 
-  const html = window
-    .split(AMP).join('&amp;')
-    .split(LT).join('&lt;')
-    .split(GT).join('&gt;')
+  const html = window.replace(RESTORE_PATTERN, (match) => RESTORE_MAP[match] ?? match)
 
   return leading + html + trailing
 }
