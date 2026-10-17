@@ -47,14 +47,23 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
   const pages = new Map<string, IndexedSection[]>()
   /** included-file abs path -> pages that include it. */
   const depPages = new Map<string, Set<string>>()
+  /** page abs path -> included files it depends on (reverse lookup map). */
+  const pageDeps = new Map<string, Set<string>>()
   let envelope: SearchIndexEnvelope | null = null
   let warnedSize = false
   let warnedEmpty = false
 
   function clearDeps(page: string): void {
-    for (const [dep, set] of depPages) {
-      set.delete(page)
-      if (set.size === 0) depPages.delete(dep)
+    const deps = pageDeps.get(page)
+    if (deps) {
+      for (const dep of deps) {
+        const set = depPages.get(dep)
+        if (set) {
+          set.delete(page)
+          if (set.size === 0) depPages.delete(dep)
+        }
+      }
+      pageDeps.delete(page)
     }
   }
 
@@ -72,10 +81,15 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
       const result = scanPage(abs, srcDir, raw, md as MarkdownRenderer, options.language)
       if (result.sections.length > 0) pages.set(abs, result.sections)
       else pages.delete(abs)
-      for (const dep of result.deps) {
-        let set = depPages.get(dep)
-        if (!set) depPages.set(dep, (set = new Set()))
-        set.add(abs)
+      if (result.deps.length > 0) {
+        let depsSet = pageDeps.get(abs)
+        if (!depsSet) pageDeps.set(abs, (depsSet = new Set()))
+        for (const dep of result.deps) {
+          let set = depPages.get(dep)
+          if (!set) depPages.set(dep, (set = new Set()))
+          set.add(abs)
+          depsSet.add(dep)
+        }
       }
     } catch (error) {
       warn(`Failed to scan ${abs}: ${String(error)}`)
@@ -86,6 +100,7 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
   function fullScan(): void {
     pages.clear()
     depPages.clear()
+    pageDeps.clear()
     for (const abs of discoverPages(srcDir, options.include, options.exclude)) {
       scanOne(abs)
     }
