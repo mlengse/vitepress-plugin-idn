@@ -91,4 +91,40 @@ describe('expandIncludes', () => {
 
     rmSync(tmpDir, { recursive: true, force: true })
   })
+
+  it('handles non-existent include file gracefully (returns original include comment)', async () => {
+    const tmpDir = join(tmpdir(), 'test_markdown_' + Date.now())
+    mkdirSync(tmpDir, { recursive: true })
+
+    const srcFile = join(tmpDir, 'index.md')
+    const srcContent = 'Before\n<!-- @include: ./non-existent.md -->\nAfter'
+
+    const result = await expandIncludes(tmpDir, srcContent, srcFile)
+    expect(result).toBe(srcContent)
+
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('logs warning when DEBUG env variable is set and include file fails to read', async () => {
+    const tmpDir = join(tmpdir(), 'test_markdown_' + Date.now())
+    mkdirSync(tmpDir, { recursive: true })
+
+    const srcFile = join(tmpDir, 'index.md')
+    const srcContent = '<!-- @include: ./missing.md -->'
+
+    const originalDebug = process.env.DEBUG
+    process.env.DEBUG = '1'
+
+    try {
+      const result = await expandIncludes(tmpDir, srcContent, srcFile)
+      expect(result).toBe(srcContent)
+    } finally {
+      if (originalDebug !== undefined) {
+        process.env.DEBUG = originalDebug
+      } else {
+        delete process.env.DEBUG
+      }
+      rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
 })
