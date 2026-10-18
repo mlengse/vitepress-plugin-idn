@@ -1,0 +1,231 @@
+import { existsSync } from 'node:fs'
+import { dirname, join, normalize } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import type { Plugin, ResolvedConfig } from 'vite'
+import {
+  HYPHENATE_RUNTIME_ID,
+  RESOLVED_HYPHENATE_RUNTIME_ID,
+} from '../core/constants'
+import type { ResolvedIdnOptions } from '../core/types'
+import { getVitePressContext, warn } from './configResolved'
+
+/** Default-theme component specifier replaced by our nav UI (research R1). */
+const THEME_SEARCH_FIND = /^\.\/(?:components\/)?VPNavBarSearch\.vue$/
+
+/**
+ * Locate Search.vue across layouts: source tree (`src/node/`), bundled node
+ * entry (`dist/node/`), bundled root entry (`dist/`).
+ */
+function resolveSearchVue(): string | null {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const candidates = [
+    join(here, '..', 'client', 'Search.vue'),
+    join(here, 'client', 'Search.vue'),
+    join(here, '..', 'src', 'client', 'Search.vue'),
+  ]
+  return candidates.find((candidate) => existsSync(candidate)) ?? null
+}
+
+/** Locate the client hyphenation runtime across source/bundled layouts. */
+function resolveHyphenationRuntime(): string | null {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const candidates = [
+    join(here, '..', 'client', 'hyphenationRuntime.ts'),
+    join(here, 'client', 'hyphenationRuntime.ts'),
+    join(here, '..', 'src', 'client', 'hyphenationRuntime.ts'),
+  ]
+  return candidates.find((candidate) => existsSync(candidate)) ?? null
+}
+
+/** Detect VitePress's default-theme nav search (ui: 'nav' alias target). */
+function usesAlgolia(userConfig: Record<string, unknown>): boolean {
+  const themeConfig = userConfig.themeConfig as Record<string, unknown> | undefined
+  const search = themeConfig?.search as Record<string, unknown> | undefined
+  return search?.provider === 'algolia'
+}
+
+/** Normalize an absolute path into a portable Vite import specifier. */
+function toImportSpecifier(path: string): string {
+  return path.replace(/\\/g, '/')
+}
+
+/** Resolve the `@theme` alias to its on-disk directory (T031). */
+function findThemeDir(alias: unknown): string | null {
+  const entries = Array.isArray(alias)
+    ? (alias as { find: unknown; replacement: unknown }[])
+    : Object.entries((alias as Record<string, string> | undefined) ?? {}).map(
+        ([find, replacement]) => ({ find, replacement }),
+      )
+  for (const entry of entries) {
+    if (entry.find === '@theme' && typeof entry.replacement === 'string') {
+      return entry.replacement
+    }
+  }
+  return null
+}
+
+function isThemeIndex(id: string, themeDir: string): boolean {
+  const clean = id.split('?')[0] ?? id
+  const normalized = normalize(clean)
+  const dir = normalize(themeDir)
+  if (!normalized.startsWith(dir)) return false
+  return /[/\\]index\.(?:[cm]?[jt]s)$/.test(normalized)
+}
+
+class CorePluginContext {
+  private aliasTarget: string | null = null
+  private isBuild = false
+  private sawSearchVue = false
+  private runtimePath: string | null = null
+  private themeDir: string | null = null
+
+  private get hyphenationEnabled(): boolean {
+    return this.options.hyphenate.enabled
+  }
+
+  constructor(private readonly options: ResolvedIdnOptions) {}
+
+  public config() {
+    // Site options for the compiled `/vue` entry (T036): dist/client/Search.js
+    // reads `__IDN_OPTIONS__` instead of the virtual module so the entry also
+    // loads outside a Vite pipeline (see scripts/build-vue-entry.mjs). The
+    // value is the same resolvedOptions payload the virtual module serves to
+    // the aliased Search.vue, so both UI paths see one source of truth.
+    const define = {
+      __IDN_OPTIONS__: JSON.stringify({
+        language: this.options.language,
+        translations: this.options.translations,
+      }),
+    }
+    if (this.options.ui !== 'nav') return { define }
+    this.aliasTarget = resolveSearchVue()
+    if (!this.aliasTarget) {
+      warn(
+        'Could not locate src/client/Search.vue - the nav search UI was not wired. ' +
+          "Set ui: 'external' and mount <IdnSearch /> manually.",
+      )
+      return { define }
+    }
+    return {
+      define,
+      resolve: {
+        alias: [{ find: THEME_SEARCH_FIND, replacement: this.aliasTarget }],
+      },
+    }
+  }
+
+  public configResolved(config: ResolvedConfig) {
+    this.isBuild = config.command === 'build'
+    const ctx = getVitePressContext(config)
+    if (ctx && usesAlgolia(ctx.userConfig)) {
+      warn(
+        "Host configures themeConfig.search.provider: 'algolia'; the idn " +
+          "nav UI is still injected per the 'ui' option - set ui: 'external' or false " +
+          'to avoid two search buttons.',
+      )
+    }
+    if (this.hyphenationEnabled) {
+      this.runtimePath = resolveHyphenationRuntime()
+      this.themeDir = findThemeDir(config.resolve.alias)
+      if (!this.runtimePath) {
+        warn(
+          'hyphenate.enabled is true but the client hyphenation runtime could not ' +
+            'be located - client-side hyphenation is disabled.',
+        )
+      }
+    }
+  }
+
+  public resolveId(id: string) {
+    if (this.hyphenationEnabled && id === HYPHENATE_RUNTIME_ID) {
+      return RESOLVED_HYPHENATE_RUNTIME_ID
+    }
+    return null
+  }
+
+  public load(id: string) {
+    if (id === RESOLVED_HYPHENATE_RUNTIME_ID && this.runtimePath) {
+      return this.runtimeModuleCode()
+    }
+    return null
+  }
+
+  // Prove the alias actually fired: if Search.vue never enters the module
+  // graph, the theme does not import './VPNavBarSearch.vue' (custom theme
+  // or a renamed specifier - R1 residual risk). Also injects the
+  // hyphenation runtime into the theme entry (T031).
+  public transform(code: string, id: string) {
+    const clean = id.split('?')[0] ?? id
+    if (this.isBuild && this.aliasTarget && normalize(clean) === normalize(this.aliasTarget)) {
+      this.sawSearchVue = true
+    }
+    if (
+      this.hyphenationEnabled &&
+      this.runtimePath &&
+      this.themeDir &&
+      isThemeIndex(clean, this.themeDir)
+    ) {
+      return {
+        code: `${code}\nimport ${JSON.stringify(HYPHENATE_RUNTIME_ID)}\n`,
+        map: null,
+      }
+    }
+    return null
+  }
+
+  public buildEnd() {
+    if (this.isBuild && this.options.ui === 'nav' && this.aliasTarget && !this.sawSearchVue) {
+      warn(
+        "The default theme's search component ('./VPNavBarSearch.vue') was not found " +
+          'in the module graph - the nav search UI is probably not injected (custom ' +
+          'theme?). Set ui: \'external\' and mount <IdnSearch /> from the package ' +
+          '"./vue" entry instead.',
+      )
+    }
+  }
+
+  private runtimeModuleCode(): string {
+    const opts = {
+      language: this.options.language,
+      minWordLength: this.options.hyphenate.minWordLength,
+      selector: this.options.hyphenate.selector,
+    }
+    return (
+      `import { installHyphenation } from ${JSON.stringify(toImportSpecifier(this.runtimePath as string))}\n` +
+      `installHyphenation(${JSON.stringify(opts)})\n`
+    )
+  }
+}
+
+export function corePlugin(options: ResolvedIdnOptions): Plugin {
+  const ctx = new CorePluginContext(options)
+
+  return {
+    name: 'vitepress-plugin-idn',
+    enforce: 'pre',
+
+    config() {
+      return ctx.config()
+    },
+
+    configResolved(config) {
+      ctx.configResolved(config)
+    },
+
+    resolveId(id) {
+      return ctx.resolveId(id)
+    },
+
+    load(id) {
+      return ctx.load(id)
+    },
+
+    transform(code, id) {
+      return ctx.transform(code, id)
+    },
+
+    buildEnd() {
+      ctx.buildEnd()
+    },
+  }
+}
