@@ -36,84 +36,129 @@ import { discoverPages, scanPage } from './scan'
 
 const MD_EXT = '.md'
 
-export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
-  let config: ResolvedConfig | null = null
-  let srcDir = process.cwd()
-  let base = '/'
-  let md: MarkdownRenderer | null = null
-  let scanPromise: Promise<void> | null = null
+class SearchIndexContext {
+  private config: ResolvedConfig | null = null
+  private srcDir = process.cwd()
+  private base = '/'
+  private md: MarkdownRenderer | null = null
+  private scanPromise: Promise<void> | null = null
 
   /** page abs path -> indexed sections (empty/absent = excluded). */
-  const pages = new Map<string, IndexedSection[]>()
+  private pages = new Map<string, IndexedSection[]>()
   /** included-file abs path -> pages that include it. */
-  const depPages = new Map<string, Set<string>>()
+  private depPages = new Map<string, Set<string>>()
   /** page abs path -> included files it depends on (reverse lookup map). */
-  const pageDeps = new Map<string, Set<string>>()
-  let envelope: SearchIndexEnvelope | null = null
-  let warnedSize = false
-  let warnedEmpty = false
+  private pageDeps = new Map<string, Set<string>>()
+  private envelope: SearchIndexEnvelope | null = null
+  private warnedSize = false
+  private warnedEmpty = false
 
-  function clearDeps(page: string): void {
-    const deps = pageDeps.get(page)
+  constructor(private readonly options: ResolvedIdnOptions) {}
+
+  public configResolved(resolved: ResolvedConfig): void {
+    this.config = resolved
+    const ctx = getVitePressContext(resolved)
+    this.srcDir = ctx?.srcDir ?? resolved.root
+    this.base = ctx?.base ?? '/'
+  }
+
+  public ensureScanned(): Promise<void> {
+    if (!this.scanPromise) {
+      this.scanPromise = this.initAndScan()
+    }
+    return this.scanPromise
+  }
+
+  public getEnvelopePayload(): string {
+    return JSON.stringify(this.envelope)
+  }
+
+  public async handleHotUpdateFile(file: string, server: ViteDevServer): Promise<boolean> {
+    if (extname(file) !== MD_EXT) return false
+    await this.ensureScanned()
+    const abs = normalize(file)
+    if (this.pages.has(abs)) {
+      await this.rescanPage(abs)
+    } else if (this.depPages.has(abs)) {
+      await Promise.all([...(this.depPages.get(abs) ?? [])].map((page) => this.scanOne(page)))
+      this.rebuildEnvelope()
+    } else {
+      // Not part of the index (excluded or unknown): let default HMR run.
+      return false
+    }
+    await this.reloadVirtual(server)
+    return true
+  }
+
+  public async rescanStructure(file: string, server: ViteDevServer): Promise<void> {
+    if (extname(file) !== MD_EXT) return
+    await this.ensureScanned()
+    await this.fullScan()
+    this.rebuildEnvelope()
+    await this.reloadVirtual(server)
+  }
+
+  private clearDeps(page: string): void {
+    const deps = this.pageDeps.get(page)
     if (deps) {
       for (const dep of deps) {
-        const set = depPages.get(dep)
+        const set = this.depPages.get(dep)
         if (set) {
           set.delete(page)
-          if (set.size === 0) depPages.delete(dep)
+          if (set.size === 0) this.depPages.delete(dep)
         }
       }
-      pageDeps.delete(page)
+      this.pageDeps.delete(page)
     }
   }
 
-  async function scanOne(abs: string): Promise<void> {
+  private async scanOne(abs: string): Promise<void> {
     let raw: string
     try {
       raw = await readFile(abs, 'utf8')
     } catch {
-      pages.delete(abs)
-      clearDeps(abs)
+      this.pages.delete(abs)
+      this.clearDeps(abs)
       return
     }
-    clearDeps(abs)
+    this.clearDeps(abs)
     try {
-      const result = await scanPage(abs, srcDir, raw, md as MarkdownRenderer, options.language)
-      if (result.sections.length > 0) pages.set(abs, result.sections)
-      else pages.delete(abs)
+      const result = await scanPage(abs, this.srcDir, raw, this.md as MarkdownRenderer, this.options.language)
+      if (result.sections.length > 0) this.pages.set(abs, result.sections)
+      else this.pages.delete(abs)
       if (result.deps.length > 0) {
-        let depsSet = pageDeps.get(abs)
-        if (!depsSet) pageDeps.set(abs, (depsSet = new Set()))
+        let depsSet = this.pageDeps.get(abs)
+        if (!depsSet) this.pageDeps.set(abs, (depsSet = new Set()))
         for (const dep of result.deps) {
-          let set = depPages.get(dep)
-          if (!set) depPages.set(dep, (set = new Set()))
+          let set = this.depPages.get(dep)
+          if (!set) this.depPages.set(dep, (set = new Set()))
           set.add(abs)
           depsSet.add(dep)
         }
       }
     } catch (error) {
       warn(`Failed to scan ${abs}: ${String(error)}`)
-      pages.delete(abs)
+      this.pages.delete(abs)
     }
   }
 
-  async function fullScan(): Promise<void> {
-    pages.clear()
-    depPages.clear()
-    pageDeps.clear()
-    const pagePaths = discoverPages(srcDir, options.include, options.exclude)
-    await Promise.all(pagePaths.map((abs) => scanOne(abs)))
+  private async fullScan(): Promise<void> {
+    this.pages.clear()
+    this.depPages.clear()
+    this.pageDeps.clear()
+    const pagePaths = discoverPages(this.srcDir, this.options.include, this.options.exclude)
+    await Promise.all(pagePaths.map((abs) => this.scanOne(abs)))
   }
 
-  function rebuildEnvelope(): void {
-    const sections = [...pages.values()].flat()
+  private rebuildEnvelope(): void {
+    const sections = [...this.pages.values()].flat()
     const docs = sections.map((section) => ({
       id: section.id,
       title: section.title,
       titles: section.titles,
       text: section.text,
     }))
-    const index = createIndex(docs, options.language)
+    const index = createIndex(docs, this.options.language)
     const meta: Record<string, SectionMeta> = {}
     for (const section of sections) {
       meta[section.id] = {
@@ -122,26 +167,26 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
         path: section.id.split('#')[0] ?? section.id,
       }
     }
-    envelope = {
+    this.envelope = {
       schemaVersion: 1,
-      language: options.language,
-      stopWordsSnapshot: stopWordsSnapshot(options.language),
+      language: this.options.language,
+      stopWordsSnapshot: stopWordsSnapshot(this.options.language),
       generatedAt: new Date().toISOString(),
       index: JSON.stringify(index.toJSON()),
       sections: meta,
     }
-    warnDiagnostics(sections.length)
+    this.warnDiagnostics(sections.length)
   }
 
-  function warnDiagnostics(sectionCount: number): void {
-    if (!warnedEmpty && sectionCount === 0) {
-      warnedEmpty = true
+  private warnDiagnostics(sectionCount: number): void {
+    if (!this.warnedEmpty && sectionCount === 0) {
+      this.warnedEmpty = true
       warn('No sections were indexed - check the `include`/`exclude` globs and site content.')
     }
-    const bytes = Buffer.byteLength(envelope?.index ?? '', 'utf8')
-    const limitMb = options.minIndexSizeWarningMB
-    if (!warnedSize && bytes > limitMb * 1024 * 1024) {
-      warnedSize = true
+    const bytes = Buffer.byteLength(this.envelope?.index ?? '', 'utf8')
+    const limitMb = this.options.minIndexSizeWarningMB
+    if (!this.warnedSize && bytes > limitMb * 1024 * 1024) {
+      this.warnedSize = true
       warn(
         `Serialized search index is ${(bytes / (1024 * 1024)).toFixed(1)} MB, ` +
           `above the ${limitMb} MB warning threshold. Consider tightening ` +
@@ -150,48 +195,42 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
     }
   }
 
-  async function initAndScan(): Promise<void> {
-    const userConfig = config ? getVitePressContext(config)?.userConfig ?? {} : {}
-    md = await createIdnMarkdownRenderer(
-      srcDir,
+  private async initAndScan(): Promise<void> {
+    const userConfig = this.config ? getVitePressContext(this.config)?.userConfig ?? {} : {}
+    this.md = await createIdnMarkdownRenderer(
+      this.srcDir,
       userConfig.markdown as MarkdownOptions | undefined,
-      base,
+      this.base,
     )
-    await fullScan()
-    rebuildEnvelope()
+    await this.fullScan()
+    this.rebuildEnvelope()
   }
 
-  function ensureScanned(): Promise<void> {
-    if (!scanPromise) {
-      scanPromise = initAndScan()
-    }
-    return scanPromise
+  private async rescanPage(abs: string): Promise<void> {
+    await this.ensureScanned()
+    await this.scanOne(abs)
+    this.rebuildEnvelope()
   }
 
-  async function rescanPage(abs: string): Promise<void> {
-    await ensureScanned()
-    await scanOne(abs)
-    rebuildEnvelope()
-  }
-
-  async function reloadVirtual(server: ViteDevServer): Promise<void> {
+  private async reloadVirtual(server: ViteDevServer): Promise<void> {
     const mod = server.moduleGraph.getModuleById(RESOLVED_VIRTUAL_ID)
     if (mod) await server.reloadModule(mod)
   }
+}
+
+export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
+  const indexCtx = new SearchIndexContext(options)
 
   return {
     name: 'vitepress-plugin-idn:search-index',
     enforce: 'pre',
 
     configResolved(resolved) {
-      config = resolved
-      const ctx = getVitePressContext(resolved)
-      srcDir = ctx?.srcDir ?? resolved.root
-      base = ctx?.base ?? '/'
+      indexCtx.configResolved(resolved)
     },
 
     async buildStart() {
-      await ensureScanned()
+      await indexCtx.ensureScanned()
     },
 
     resolveId(id) {
@@ -210,38 +249,21 @@ export function searchIndexPlugin(options: ResolvedIdnOptions): Plugin {
         })}`
       }
       if (id !== RESOLVED_VIRTUAL_ID) return null
-      await ensureScanned()
+      await indexCtx.ensureScanned()
       // Export the envelope as a JSON *string*: minifiers re-serialize object
       // literals (unquoted keys / single quotes), JSON.stringify text keeps
       // its exact bytes in the emitted chunk, and the client parses once.
-      const payload = JSON.stringify(envelope)
+      const payload = indexCtx.getEnvelopePayload()
       return `export default ${JSON.stringify(payload)}`
     },
 
     async handleHotUpdate({ file, server }) {
-      if (extname(file) !== MD_EXT) return
-      await ensureScanned()
-      const abs = normalize(file)
-      if (pages.has(abs)) {
-        await rescanPage(abs)
-      } else if (depPages.has(abs)) {
-        await Promise.all([...(depPages.get(abs) ?? [])].map((page) => scanOne(page)))
-        rebuildEnvelope()
-      } else {
-        // Not part of the index (excluded or unknown): let default HMR run.
-        return
-      }
-      await reloadVirtual(server)
+      const handled = await indexCtx.handleHotUpdateFile(file, server)
+      if (!handled) return
     },
 
     configureServer(server) {
-      const rescanStructure = async (file: string): Promise<void> => {
-        if (extname(file) !== MD_EXT) return
-        await ensureScanned()
-        await fullScan()
-        rebuildEnvelope()
-        await reloadVirtual(server)
-      }
+      const rescanStructure = (file: string) => indexCtx.rescanStructure(file, server)
       server.watcher.on('add', rescanStructure)
       server.watcher.on('unlink', rescanStructure)
     },
